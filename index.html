@@ -1104,6 +1104,126 @@ function setQrStatus(msg, type) {
 }
 
 // ======================================================
+// CAMERA
+// ======================================================
+
+let currentTrack = null;
+let scanRunning = false;
+
+async function startCamera() {
+
+  try {
+
+    const video = document.getElementById("qrVideo");
+
+    qrStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: {
+          ideal: "environment"
+        },
+        width: {
+          ideal: 1280
+        },
+        height: {
+          ideal: 720
+        }
+      },
+      audio: false
+    });
+
+    currentTrack = qrStream.getVideoTracks()[0];
+
+    video.srcObject = qrStream;
+
+    video.setAttribute("playsinline", true);
+    video.setAttribute("webkit-playsinline", true);
+
+    video.autoplay = true;
+    video.muted = true;
+
+    await video.play();
+
+    scanRunning = true;
+
+    scanFrame();
+
+  } catch(err) {
+
+    console.error(err);
+
+    alert(
+      "เปิดกล้องไม่ได้\n\n" +
+      "1. อนุญาต Camera\n" +
+      "2. เปิดผ่าน HTTPS\n" +
+      "3. ห้ามเปิดผ่าน LINE\n\n" +
+      err.message
+    );
+  }
+}
+
+function stopCamera() {
+
+  scanRunning = false;
+
+  if (qrAnimFrame) {
+    cancelAnimationFrame(qrAnimFrame);
+    qrAnimFrame = null;
+  }
+
+  if (qrStream) {
+
+    qrStream.getTracks().forEach(track => {
+      track.stop();
+    });
+
+    qrStream = null;
+  }
+
+  const video = document.getElementById("qrVideo");
+
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+  }
+}
+
+// ======================================================
+// FLASH
+// ======================================================
+
+async function toggleFlash() {
+
+  try {
+
+    if (!currentTrack) {
+      return;
+    }
+
+    const capabilities = currentTrack.getCapabilities();
+
+    if (!capabilities.torch) {
+
+      alert("มือถือไม่รองรับ Flash");
+
+      return;
+    }
+
+    const settings = currentTrack.getSettings();
+
+    await currentTrack.applyConstraints({
+      advanced: [{
+        torch: !settings.torch
+      }]
+    });
+
+  } catch(err) {
+
+    console.error(err);
+
+  }
+}
+
+// ======================================================
 // LOGIN
 // ======================================================
 
