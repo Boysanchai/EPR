@@ -902,6 +902,25 @@ h1, h2, h3, .font-semibold, .font-bold {
 
 
 <script>
+const API_URL =
+"https://script.google.com/macros/s/AKfycbx2N1RJiS8fKTA9jyBYyLa9D0GIQx052JdIoVnTngATlYxo6nJsh9hhWOz2O2ZQIa8f/exec";
+
+async function callAPI(action, data = {}) {
+
+  const res = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      action,
+      ...data
+    })
+  });
+
+  return await res.json();
+}
+ 
 let currentData = null;
 let timer;
 let lastKeyword = "";
