@@ -1573,12 +1573,11 @@ async function retryCamera() {
   camChainIdx = 0;
   await tryNextCamera();
 }
-</script>
 
- <script>
-const API_URL = "YOUR_WEBAPP_URL";
+ async function submitLoginEmail() {
 
-async function callAPI(action, data = {}) {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
   try {
 
@@ -1588,21 +1587,37 @@ async function callAPI(action, data = {}) {
         "Content-Type": "text/plain;charset=utf-8"
       },
       body: JSON.stringify({
-        action,
-        ...data
+        action: "login",
+        email: email,
+        password: password
       })
     });
 
-    return await res.json();
+    const result = await res.json();
 
-  } catch(err) {
+    if (result.success) {
+
+      alert("Login success");
+
+      localStorage.setItem("user", JSON.stringify(result.user));
+
+      location.href = "dashboard.html";
+
+    } else {
+
+      alert(result.message || "Login failed");
+
+    }
+
+  } catch (err) {
 
     console.error(err);
-    alert("API ERROR");
+    alert("Connection error");
 
   }
 }
 </script>
+
 
 </body>
 </html>
