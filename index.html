@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+ 
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width,initial-scale=1,viewport-fit=cover">
+
+<meta http-equiv="Permissions-Policy"
+content="camera=*, microphone=*">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=LINE+Seed+Sans+TH:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+
+<style>
+:root {
+  --bg: #f7f8fa;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --accent: #c9a84c;
+}
+body {
+  font-family: 'Inter', 'LINE Seed Sans TH', system-ui, -apple-system, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--text);
+  background: #f4f6f9;
+  overflow: hidden;
+}
+.hidden { display:none; }
+.custom-scroll::-webkit-scrollbar { height: 4px; }
+.custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+h1, h2, h3, .font-semibold, .font-bold {
+  font-family: 'Inter', 'LINE Seed Sans TH', sans-serif;
+  font-weight: 600;
+}
+.input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-top: 4px;
+  font-size: 13px;
+}
+.input:focus {
+  outline: none;
+  border-color: #c9a84c;
+  box-shadow: 0 0 0 2px rgba(201,168,76,0.15);
+}
+.topbar-gold { border-bottom: 2px solid rgba(201,168,76,0.4); }
+.gold-line { height: 2px; background: linear-gradient(90deg, transparent, #c9a84c, transparent); }
+.topbar-main { background: #0f1b2d; border-bottom: 2px solid rgba(201,168,76,0.4); }
+.topbar-inner { display:flex; justify-content:space-between; align-items:center; padding:16px 24px; }
+.topbar-left { display:flex; align-items:center; gap:12px; }
+.topbar-logo { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#c9a84c,#f0d080); }
+.topbar-title { font-size:15px; font-weight:600; color:#f0d080; }
+.topbar-sub { font-size:11px; color:rgba(255,255,255,0.45); }
+.topbar-btn { border:1px solid rgba(201,168,76,0.5); color:#f0d080; padding:6px 14px; border-radius:8px; font-size:13px; transition:0.2s; }
+.topbar-btn:hover { background:rgba(201,168,76,0.12); }
+.modal-overlay { opacity:0; transition:opacity 0.3s ease; backdrop-filter:blur(4px); }
+.modal-overlay.show { opacity:1; }
+.modal-box { transform:translateY(100px); opacity:0; transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s ease; }
+.modal-overlay.show .modal-box { transform:translateY(0); opacity:1; }
+.modal-overlay.closing .modal-box { transform:translateY(80px); opacity:0; }
+.modal-overlay.closing { opacity:0; }
+.detail-icon { width:32px; height:32px; display:flex; align-items:center; justify-content:center; background:#f0f2f5; border-radius:999px; flex-shrink:0; }
+.detail-label { width:130px; font-size:13px; color:#8896a9; flex-shrink:0; }
+.detail-value { font-size:14px; color:#1a2332; }
+
+/* =============== QR SCANNER MODAL =============== */
+#qrModal {
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:999;
+  background:rgba(10,18,32,0.85);
+  backdrop-filter:blur(6px);
+  align-items:center;
+  justify-content:center;
+}
+#qrModal.active { display:flex; }
+.qr-box {
+  background:#0f1b2d;
+  border:1px solid rgba(201,168,76,0.35);
+  border-radius:20px;
+  padding:28px 24px 24px;
+  width:340px;
+  max-width:95vw;
+  box-shadow:0 24px 60px rgba(0,0,0,0.5);
+  position:relative;
+  animation: qrSlideIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes qrSlideIn {
+  from { transform:translateY(60px) scale(0.95); opacity:0; }
+  to   { transform:translateY(0) scale(1); opacity:1; }
+}
+.qr-video-wrap {
+  position:relative;
+  width:100%;
+  aspect-ratio:1;
+  border-radius:14px;
+  overflow:hidden;
+  background:#000;
+}
+#qrVideo {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+/* scanning frame corners */
+.qr-frame {
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+}
+.qr-corner {
+  position:absolute;
+  width:28px;
+  height:28px;
+  border-color:#c9a84c;
+  border-style:solid;
+}
+.qr-corner.tl { top:14px;left:14px;border-width:3px 0 0 3px;border-radius:4px 0 0 0; }
+.qr-corner.tr { top:14px;right:14px;border-width:3px 3px 0 0;border-radius:0 4px 0 0; }
+.qr-corner.bl { bottom:14px;left:14px;border-width:0 0 3px 3px;border-radius:0 0 0 4px; }
+.qr-corner.br { bottom:14px;right:14px;border-width:0 3px 3px 0;border-radius:0 0 4px 0; }
+.qr-scan-line {
+  position:absolute;
+  left:18px; right:18px;
+  height:2px;
+  background:linear-gradient(90deg, transparent, #c9a84c, transparent);
+  border-radius:2px;
+  animation: scanMove 2s ease-in-out infinite;
+  box-shadow:0 0 8px rgba(201,168,76,0.6);
+}
+@keyframes scanMove {
+  0%   { top:18px; }
+  50%  { top:calc(100% - 20px); }
+  100% { top:18px; }
+}
+.qr-status {
+  text-align:center;
+  margin-top:14px;
+  font-size:13px;
+  color:rgba(255,255,255,0.55);
+  min-height:20px;
+}
+.qr-status.success {
+  color:#6ee7b7;
+  font-weight:600;
+}
+.qr-status.error {
+  color:#fca5a5;
+}
+.qr-close-btn {
+  position:absolute;
+  top:14px; right:16px;
+  background:rgba(255,255,255,0.08);
+  border:none;
+  color:rgba(255,255,255,0.5);
+  width:30px; height:30px;
+  border-radius:50%;
+  font-size:16px;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:0.2s;
+}
+.qr-close-btn:hover { background:rgba(255,255,255,0.15); color:#fff; }
+
+/* QR scan button style */
+.qr-scan-trigger {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:6px 12px;
+  border-radius:6px;
+  border:1px solid rgba(201,168,76,0.6);
+  background:rgba(201,168,76,0.08);
+  color:#c9a84c;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all 0.2s;
+  white-space:nowrap;
+  margin-top:4px;
+  height:34px;
+}
+.qr-scan-trigger:hover {
+  background:rgba(201,168,76,0.18);
+  border-color:#c9a84c;
+  transform:translateY(-1px);
+  box-shadow:0 4px 12px rgba(201,168,76,0.2);
+}
+.qr-scan-trigger svg {
+  width:14px;
+  height:14px;
+}
+/* input+qr row */
+.input-qr-row {
+  display:flex;
+  gap:6px;
+  align-items:flex-end;
+}
+.input-qr-row .input {
+  flex:1;
+  margin-top:0;
+}
+</style>
+</head>
+
+<body class="min-h-screen pb-6">
+
+<!-- LOGIN MODAL -->
+<div id="loginModal" style="display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(10,18,32,0.92);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;">
+  <div style="background:#0f1b2d;border:1px solid rgba(201,168,76,0.35);
+    border-radius:20px;padding:32px 28px;width:340px;max-width:90vw;
+    box-shadow:0 24px 60px rgba(0,0,0,0.6);text-align:center;">
+    
+    <div style="width:56px;height:56px;border-radius:50%;margin:0 auto 16px;
+      background:linear-gradient(135deg,#c9a84c,#f0d080);
+      display:flex;align-items:center;justify-content:center;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0f1b2d" stroke-width="2.2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>
+
+    <div style="font-size:16px;font-weight:700;color:#f0d080;margin-bottom:6px;">PMN SYSTEM</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.45);margin-bottom:24px;">กรุณากรอก Email เพื่อเข้าสู่ระบบ</div>
+
+    <input id="loginEmailInput" type="email" placeholder="your@email.com"
+      style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid rgba(201,168,76,0.4);
+        background:rgba(255,255,255,0.06);color:#fff;font-size:14px;outline:none;
+        box-sizing:border-box;text-align:center;"
+      onfocus="this.style.borderColor='#c9a84c'"
+      onblur="this.style.borderColor='rgba(201,168,76,0.4)'"
+      onkeydown="if(event.key==='Enter') submitLoginEmail()">
+
+    <div id="loginError" style="color:#fca5a5;font-size:12px;margin-top:8px;display:none;">
+      กรุณากรอก Email ให้ถูกต้อง
+    </div>
+
+    <button onclick="submitLoginEmail()"
+      style="width:100%;margin-top:16px;padding:12px;border-radius:10px;
+        background:linear-gradient(135deg,#c9a84c,#f0d080);
+        color:#0f1b2d;font-size:14px;font-weight:700;border:none;cursor:pointer;">
+      เข้าสู่ระบบ
+    </button>
+  </div>
+</div>
+
+<!-- ================= MENU ================= -->
+<div id="menuPage" class="min-h-screen" style="background:#f0f2f5;">
+  <div class="topbar-gold px-6 py-4 flex justify-between items-center shadow-lg" style="background:#0f1b2d;">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#c9a84c,#f0d080);">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#0f1b2d" stroke-width="2.2">
+          <path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-base font-semibold tracking-wide" style="color:#f0d080;">PMN SYSTEM</h1>
+        <p class="text-xs" style="color:rgba(255,255,255,0.45);">Stock & Sparepart Management</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+    <div class="text-sm" id="userEmail" style="color:rgba(255,255,255,0.55);">USER</div>
+    <button onclick="logoutUser()" 
+      style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);
+      color:rgba(255,255,255,0.4);background:transparent;cursor:pointer;"
+      onmouseover="this.style.borderColor='rgba(201,168,76,0.5)';this.style.color='#f0d080'"
+      onmouseout="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='rgba(255,255,255,0.4)'">
+      ⇄ เปลี่ยน
+    </button>
+  </div>
+  </div>
+  <div class="gold-line"></div>
+
+  <div class="max-w-7xl mx-auto p-6 space-y-6">
+    <div class="border-b pb-3" style="border-color:#dde2ea;">
+      <h2 class="text-lg font-semibold" style="color:#1a2332;">Main Menu</h2>
+      <p class="text-xs" style="color:#8896a9;">Select module to continue</p>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+      <div onclick="showInput()" class="relative cursor-pointer overflow-hidden rounded-xl"
+           style="height:200px;transition:all 0.3s ease;box-shadow:0 4px 12px rgba(0,0,0,0.1);"
+           onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px rgba(0,0,0,0.2)'"
+           onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'">
+        <div style="position:absolute;inset:0;background-image:url('https://images.unsplash.com/photo-1553413077-190dd305871c?w=400&q=80');background-size:cover;background-position:center;transition:transform 0.4s ease;"
+             onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'"></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(15,27,45,0.55) 0%,rgba(15,27,45,0.85) 100%);"></div>
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#c9a84c,#f0d080);"></div>
+        <div style="position:absolute;inset:0;padding:20px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div style="width:40px;height:40px;border-radius:10px;background:rgba(201,168,76,0.2);border:1px solid rgba(201,168,76,0.5);display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="package-plus" style="width:20px;height:20px;color:#f0d080;"></i>
+          </div>
+          <div>
+            <div style="font-size:10px;letter-spacing:2px;color:rgba(201,168,76,0.8);text-transform:uppercase;margin-bottom:4px;">Module</div>
+            <div style="font-size:15px;font-weight:700;color:#ffffff;line-height:1.2;">SPARE PART<br>INPUT</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:4px;">Record incoming parts</div>
+          </div>
+        </div>
+      </div>
+
+      <div onclick="showForm()" class="relative cursor-pointer overflow-hidden rounded-xl"
+           style="height:200px;transition:all 0.3s ease;box-shadow:0 4px 12px rgba(0,0,0,0.1);"
+           onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px rgba(0,0,0,0.2)'"
+           onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'">
+        <div style="position:absolute;inset:0;background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=400&q=80');background-size:cover;background-position:center;transition:transform 0.4s ease;"
+             onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'"></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(180,40,40,0.5) 0%,rgba(120,20,20,0.88) 100%);"></div>
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#dc3545,#ff6b6b);"></div>
+        <div style="position:absolute;inset:0;padding:20px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div style="width:40px;height:40px;border-radius:10px;background:rgba(220,53,69,0.25);border:1px solid rgba(220,53,69,0.5);display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="clipboard-minus" style="width:20px;height:20px;color:#ff9999;"></i>
+          </div>
+          <div>
+            <div style="font-size:10px;letter-spacing:2px;color:rgba(255,150,150,0.8);text-transform:uppercase;margin-bottom:4px;">Module</div>
+            <div style="font-size:15px;font-weight:700;color:#ffffff;line-height:1.2;">SPARE PART<br>REQUISITION</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:4px;">Withdraw from inventory</div>
+          </div>
+        </div>
+      </div>
+
+      <div onclick="showReport()" class="relative cursor-pointer overflow-hidden rounded-xl"
+           style="height:200px;transition:all 0.3s ease;box-shadow:0 4px 12px rgba(0,0,0,0.1);"
+           onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px rgba(0,0,0,0.2)'"
+           onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'">
+        <div style="position:absolute;inset:0;background-image:url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&q=80');background-size:cover;background-position:center;transition:transform 0.4s ease;"
+             onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'"></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(15,27,45,0.55) 0%,rgba(15,27,45,0.88) 100%);"></div>
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#3b82f6,#60a5fa);"></div>
+        <div style="position:absolute;inset:0;padding:20px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div style="width:40px;height:40px;border-radius:10px;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.5);display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="bar-chart-2" style="width:20px;height:20px;color:#93c5fd;"></i>
+          </div>
+          <div>
+            <div style="font-size:10px;letter-spacing:2px;color:rgba(147,197,253,0.8);text-transform:uppercase;margin-bottom:4px;">Module</div>
+            <div style="font-size:15px;font-weight:700;color:#ffffff;line-height:1.2;">STOCK<br>REPORT</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:4px;">View & export data</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="approveCard" onclick="showApprove()" class="relative cursor-pointer overflow-hidden rounded-xl"
+        style="display:none; height:200px; transition:all 0.3s ease; box-shadow:0 4px 12px rgba(0,0,0,0.1);"
+           onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px rgba(0,0,0,0.2)'"
+           onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'">
+        <div style="position:absolute;inset:0;background-image:url('https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400&q=80');background-size:cover;background-position:center;transition:transform 0.4s ease;"
+             onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'"></div>
+        <div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(10,80,50,0.55) 0%,rgba(10,60,35,0.88) 100%);"></div>
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#198754,#34d399);"></div>
+        <div style="position:absolute;inset:0;padding:20px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div style="width:40px;height:40px;border-radius:10px;background:rgba(25,135,84,0.25);border:1px solid rgba(25,135,84,0.5);display:flex;align-items:center;justify-content:center;">
+            <i data-lucide="shield-check" style="width:20px;height:20px;color:#6ee7b7;"></i>
+          </div>
+          <div>
+            <div style="font-size:10px;letter-spacing:2px;color:rgba(110,231,183,0.8);text-transform:uppercase;margin-bottom:4px;">Module</div>
+            <div style="font-size:15px;font-weight:700;color:#ffffff;line-height:1.2;">APPROVAL</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:4px;">Approve or reject</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ================= INPUT PAGE ================= -->
+<div id="inputPage" class="hidden min-h-screen" style="background:#f0f2f5;">
+  <div class="topbar-gold px-6 py-4 flex justify-between items-center shadow-lg" style="background:#0f1b2d;">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#c9a84c,#f0d080);">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#0f1b2d" stroke-width="2.2">
+          <path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-base font-semibold tracking-wide" style="color:#f0d080;">PMN SYSTEM</h1>
+        <p class="text-xs" style="color:rgba(255,255,255,0.45);">Stock Input Module</p>
+      </div>
+    </div>
+    <button onclick="backToMenu()" class="px-4 py-1.5 rounded text-sm transition"
+      style="border:1px solid rgba(201,168,76,0.5);color:#f0d080;background:transparent;"
+      onmouseover="this.style.background='rgba(201,168,76,0.12)'"
+      onmouseout="this.style.background='transparent'">
+      ← Back
+    </button>
+  </div>
+  <div class="gold-line"></div>
+
+  <div class="max-w-5xl mx-auto p-6 space-y-6 overflow-y-auto h-[calc(100vh-70px)]">
+    <div class="border-b pb-3" style="border-color:#dde2ea;">
+      <h2 class="text-lg font-semibold" style="color:#1a2332;">Spare Part Input</h2>
+      <p class="text-xs" style="color:#8896a9;">บันทึกรับอะไหล่เข้าคลัง</p>
+    </div>
+
+    <div class="bg-white border rounded-lg p-6" style="border-color:#dde2ea;">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <!-- Item Code + QR -->
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Item Code</label>
+          <div class="input-qr-row">
+            <input type="text" id="in_itemCode" oninput="searchInputItem('code')" class="input">
+            <!-- แทนที่ปุ่ม qr-scan-trigger ทุกอัน -->
+            <button class="qr-scan-trigger" onclick="openQR('in_itemCode')" title="สแกน QR">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <path d="M14 14h2v2h-2z"/><path d="M18 14h3"/><path d="M14 18h2"/><path d="M18 18h3"/><path d="M18 21v-3"/>
+              </svg>
+              สแกน QR
+            </button>
+            <!-- input file ซ่อนไว้ -->
+            <input type="file" id="qrFileInput_in_itemCode" accept="image/*" capture="environment" 
+              style="display:none" onchange="decodeQRFromFile(this, 'in_itemCode')">
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Item Name</label>
+          <input type="text" id="in_itemName" oninput="searchInputItem('name')" class="input">
+        </div>
+
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Spec</label>
+          <select id="in_spec" class="input" style="background:#f8f9fb;"></select>
+        </div>
+
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Quantity รับเข้า</label>
+          <input type="number" id="in_qty" min="1" class="input">
+        </div>
+
+        <div>
+          <label class="text-xs" style="color:#8896a9;">ผู้รับ / Receiver</label>
+          <input type="text" id="in_receiver" class="input" readonly style="background:#f8f9fb;">
+        </div>
+
+        <div>
+          <label class="text-xs" style="color:#8896a9;">เอกสารอ้างอิง (PO/Ref)</label>
+          <input type="text" id="in_ref" class="input" placeholder="เช่น PO-2026-001">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="text-xs" style="color:#8896a9;">หมายเหตุ</label>
+          <input type="text" id="in_remark" class="input">
+        </div>
+
+      </div>
+
+      <div class="mt-5 flex gap-3">
+        <button onclick="clearInputForm()"
+          class="w-1/3 py-2 rounded font-semibold text-sm transition"
+          style="border:1px solid #dde2ea;color:#8896a9;background:#f8f9fb;">
+          <span class="flex items-center justify-center gap-2">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+            Clear
+          </span>
+        </button>
+        <button onclick="saveInput()" id="saveInputBtn"
+          class="flex-1 py-2 rounded font-semibold text-sm transition"
+          style="background:linear-gradient(135deg,#c9a84c,#f0d080);color:#0f1b2d;">
+          <span class="flex items-center justify-center gap-2">
+            <i data-lucide="package-plus" class="w-4 h-4"></i>
+            บันทึกรับเข้า
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TODAY LIST -->
+    <div class="bg-white border rounded-lg p-5" style="border-color:#dde2ea;">
+      <div class="flex items-center gap-2 mb-4">
+        <i data-lucide="history" class="w-4 h-4 text-gray-500"></i>
+        <div class="font-medium text-gray-700 text-sm">รายการรับเข้าวันนี้</div>
+        <div id="inCountBadge" class="text-xs bg-gray-200 px-2 py-1 rounded-full">0 รายการ</div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr style="border-bottom:2px solid #c9a84c;">
+              <th class="text-left py-2 px-3" style="font-size:11px;color:#8896a9;font-weight:600;text-transform:uppercase;">Item Code</th>
+              <th class="text-left py-2 px-3" style="font-size:11px;color:#8896a9;font-weight:600;text-transform:uppercase;">Item Name</th>
+              <th class="text-left py-2 px-3" style="font-size:11px;color:#8896a9;font-weight:600;text-transform:uppercase;">Spec</th>
+              <th class="text-left py-2 px-3" style="font-size:11px;color:#8896a9;font-weight:600;text-transform:uppercase;">Qty</th>
+              <th class="text-left py-2 px-3" style="font-size:11px;color:#8896a9;font-weight:600;text-transform:uppercase;">Ref</th>
+              <th class="text-left py-2 px-3" style="font-size:11px;color:#8896a9;font-weight:600;text-transform:uppercase;">เวลา</th>
+              <th class="text-left py-2 px-3" style="font-size:11px;color:#8896a9;font-weight:600;text-transform:uppercase;">วันที่</th>
+            </tr>
+          </thead>
+          <tbody id="inTableBody">
+            <tr><td colspan="6" class="py-4 text-center text-xs" style="color:#8896a9;">ยังไม่มีรายการ</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================= REPORT ================= -->
+<div id="reportPage" class="hidden min-h-screen" style="background:#f0f2f5;">
+  <div class="topbar-gold px-6 py-4 flex justify-between items-center shadow-lg" style="background:#0f1b2d;">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#c9a84c,#f0d080);">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#0f1b2d" stroke-width="2.2">
+          <path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-base font-semibold tracking-wide" style="color:#f0d080;">PMN SYSTEM</h1>
+        <p class="text-xs" style="color:rgba(255,255,255,0.45);">Stock Report Module</p>
+      </div>
+    </div>
+    <button onclick="backToMenu()" class="px-4 py-1.5 rounded text-sm transition"
+      style="border:1px solid rgba(201,168,76,0.5);color:#f0d080;background:transparent;"
+      onmouseover="this.style.background='rgba(201,168,76,0.12)'"
+      onmouseout="this.style.background='transparent'">
+      ← Back
+    </button>
+  </div>
+  <div class="gold-line"></div>
+
+  <div class="max-w-7xl mx-auto p-6 space-y-6">
+    <div class="border-b pb-3" style="border-color:#dde2ea;">
+      <h2 class="text-lg font-semibold" style="color:#1a2332;">Stock Report</h2>
+      <p class="text-xs" style="color:#8896a9;">Inventory transaction history</p>
+    </div>
+    <div class="bg-white border rounded-lg p-5" style="border-color:#dde2ea;">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Start Date</label>
+          <input type="date" id="start" class="w-full border rounded px-2 py-1 mt-1 text-sm focus:outline-none" style="border-color:#dde2ea;" onfocus="this.style.borderColor='#c9a84c'" onblur="this.style.borderColor='#dde2ea'">
+        </div>
+        <div>
+          <label class="text-xs" style="color:#8896a9;">End Date</label>
+          <input type="date" id="end" class="w-full border rounded px-2 py-1 mt-1 text-sm focus:outline-none" style="border-color:#dde2ea;" onfocus="this.style.borderColor='#c9a84c'" onblur="this.style.borderColor='#dde2ea'">
+        </div>
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Source</label>
+          <select id="sourceFilter" class="w-full border rounded px-2 py-1 mt-1 text-sm focus:outline-none" style="border-color:#dde2ea;" onfocus="this.style.borderColor='#c9a84c'" onblur="this.style.borderColor='#dde2ea'">
+            <option value="All">All</option>
+            <option value="Stork">Stock In</option>
+            <option value="Issue">Stock Out</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button onclick="generate()" id="btn" class="w-full py-1.5 rounded text-sm font-semibold transition" style="background:linear-gradient(135deg,#c9a84c,#f0d080);color:#0f1b2d;">Generate</button>
+        </div>
+      </div>
+    </div>
+    <div id="resultArea" class="hidden space-y-3">
+      <div class="flex justify-between items-center text-sm">
+        <div style="color:#4a5568;">Total: <span id="count" class="font-semibold" style="color:#c9a84c;">0</span> records</div>
+        <button onclick="downloadExcel()" class="px-3 py-1 rounded text-sm transition" style="border:1px solid #198754;color:#198754;" onmouseover="this.style.background='rgba(25,135,84,0.06)'" onmouseout="this.style.background='transparent'">Export Excel</button>
+      </div>
+      <div class="bg-white border rounded-lg overflow-hidden" style="border-color:#dde2ea;">
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-sm">
+            <thead id="tableHead" style="background:#f8f9fb;border-bottom:2px solid #dde2ea;"></thead>
+            <tbody id="tableBody" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================= FORM (REQUISITION) ================= -->
+<div id="formPage" class="hidden min-h-screen" style="background:#f0f2f5;">
+  <div class="topbar-gold px-6 py-4 flex justify-between items-center shadow-lg" style="background:#0f1b2d;">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#c9a84c,#f0d080);">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="#0f1b2d" stroke-width="2.2">
+          <path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-base font-semibold tracking-wide" style="color:#f0d080;">PMN SYSTEM</h1>
+        <p class="text-xs" style="color:rgba(255,255,255,0.45);">Transaction Module</p>
+      </div>
+    </div>
+    <button onclick="backToMenu()" class="px-4 py-1.5 rounded text-sm transition"
+      style="border:1px solid rgba(201,168,76,0.5);color:#f0d080;background:transparent;">← Back</button>
+  </div>
+  <div class="gold-line"></div>
+
+  <div class="max-w-5xl mx-auto p-6 space-y-6 overflow-y-auto h-[calc(100vh-100px)]">
+    <div class="border-b pb-3" style="border-color:#dde2ea;">
+      <h2 class="text-lg font-semibold" style="color:#1a2332;">Spare Part Requisition</h2>
+      <p class="text-xs" style="color:#8896a9;">Input / Issue spare parts</p>
+    </div>
+    <div class="bg-white border rounded-lg p-6" style="border-color:#dde2ea;">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Employee ID</label>
+          <input type="text" id="empId" oninput="fetchEmpName()" class="input">
+        </div>
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Employee Name</label>
+          <input type="text" id="empName" class="input" style="background:#f8f9fb;" readonly>
+        </div>
+
+        <!-- Item Code + QR -->
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Item Code</label>
+          <div class="input-qr-row">
+            <input type="text" id="itemCode" oninput="searchItemClient('code')" class="input">
+            <!-- สำหรับ Requisition -->
+            <button class="qr-scan-trigger" onclick="openQR('itemCode')" title="สแกน QR">...</button>
+            <input type="file" id="qrFileInput_itemCode" accept="image/*" capture="environment"
+              style="display:none" onchange="decodeQRFromFile(this, 'itemCode')">
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Item Name</label>
+          <input type="text" id="itemName" oninput="searchItemClient('name')" class="input">
+        </div>
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Spec</label>
+          <select id="spec" class="input" style="background:#f8f9fb;"></select>
+        </div>
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Quantity</label>
+          <input type="number" id="qty" class="input">
+        </div>
+        <div>
+          <label class="text-xs" style="color:#8896a9;">Issuer</label>
+          <input type="text" id="issuer" class="input">
+        </div>
+        <div class="md:col-span-2">
+          <label class="text-xs" style="color:#8896a9;">Remark</label>
+          <input type="text" id="remark" class="input">
+        </div>
+      </div>
+      <div class="mt-5 flex gap-3">
+        <button onclick="clearForm()" class="w-1/3 py-2 rounded font-semibold text-sm transition" style="border:1px solid #dde2ea;color:#8896a9;background:#f8f9fb;">
+          <span class="flex items-center justify-center gap-2"><i data-lucide="rotate-ccw" class="w-4 h-4"></i>Clear</span>
+        </button>
+        <button onclick="saveData()" id="saveBtn" class="flex-1 py-2 rounded font-semibold text-sm transition" style="background:linear-gradient(135deg,#c9a84c,#f0d080);color:#0f1b2d;">
+          Save Transaction
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================= DETAIL PAGE ================= -->
+<div id="detailPage" class="hidden min-h-screen relative overflow-hidden" style="background:linear-gradient(135deg,#0f1b2d 0%,#1a2d4a 50%,#0f1b2d 100%);">
+  <div class="absolute inset-0 pointer-events-none" style="background-image:linear-gradient(120deg,transparent 40%,rgba(201,168,76,0.06) 50%,transparent 60%);background-size:200% 200%;"></div>
+  <div class="topbar-gold px-10 py-5 flex justify-between items-center" style="background:rgba(15,27,45,0.95);backdrop-filter:blur(10px);">
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg" style="background:linear-gradient(135deg,#c9a84c,#f0d080);">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="#0f1b2d" stroke-width="2">
+          <path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/><path d="M3 17l9 4 9-4"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-semibold tracking-wide" style="color:#f0d080;">PMN SYSTEM</h1>
+        <p class="text-xs" style="color:rgba(255,255,255,0.45);">Transaction Detail</p>
+      </div>
+    </div>
+    <button onclick="backToMenu()" class="px-5 py-2 rounded-full text-sm transition" style="border:1px solid rgba(201,168,76,0.5);color:#f0d080;" onmouseover="this.style.background='rgba(201,168,76,0.1)'" onmouseout="this.style.background='transparent'">← Back</button>
+  </div>
+  <div class="gold-line"></div>
+  <div class="flex justify-center px-4 md:px-10 py-10">
+    <div class="w-full max-w-5xl bg-white rounded-2xl shadow-2xl border p-8 md:p-10 relative" style="border-color:rgba(201,168,76,0.15);box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div class="absolute top-6 right-6 rounded-xl border shadow-sm w-[160px] p-4" style="background:#f8f9fb;border-color:#dde2ea;">
+        <div class="text-xs tracking-wider" style="color:#8896a9;">STATUS</div>
+        <div id="d_status" class="mt-2"></div>
+      </div>
+      <div class="flex items-center gap-5 mb-8">
+        <div class="w-16 h-16 rounded-full flex items-center justify-center shadow-lg" style="background:linear-gradient(135deg,#0f1b2d,#1a2d4a);border:2px solid rgba(201,168,76,0.4);">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="#c9a84c" stroke-width="2">
+            <path d="M9 12h6m-6 4h6M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-2xl font-semibold" style="color:#1a2332;">รายละเอียดการเบิก</h2>
+          <p class="text-sm" style="color:#8896a9;">Transaction Information</p>
+        </div>
+      </div>
+      <div class="border-b mb-6" style="border-color:#eef0f3;"></div>
+      <div class="grid md:grid-cols-2">
+        <div class="border-r pr-0 md:pr-6 space-y-0" style="border-color:#eef0f3;">
+          <div class="flex items-center gap-3 py-3 border-b" style="border-color:#eef0f3;">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <div class="detail-label">Emp ID</div><div id="d_empId" class="detail-value"></div>
+          </div>
+          <div class="flex items-center gap-3 py-3 border-b" style="border-color:#eef0f3;">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <div class="detail-label">Name</div><div id="d_empName" class="detail-value"></div>
+          </div>
+          <div class="flex items-center gap-3 py-3 border-b" style="border-color:#eef0f3;">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8L6 7h12l-2-4z"/></svg></div>
+            <div class="detail-label">Item Code</div><div id="d_itemCode" class="detail-value"></div>
+          </div>
+          <div class="flex items-center gap-3 py-3 border-b" style="border-color:#eef0f3;">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+            <div class="detail-label">Item Name</div><div id="d_itemName" class="detail-value"></div>
+          </div>
+          <div class="flex items-center gap-3 py-3" style="border-color:#eef0f3;">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M2 6h20"/><path d="M2 18h20"/></svg></div>
+            <div class="detail-label">Spec</div><div id="d_spec" class="detail-value"></div>
+          </div>
+        </div>
+        <div class="pl-0 md:pl-6">
+          <div class="flex items-center gap-3 py-3 border-b" style="border-color:#eef0f3;">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+            <div class="detail-label">Qty</div><div id="d_qty" class="detail-value font-semibold"></div>
+          </div>
+          <div class="flex items-center gap-3 py-3 border-b" style="border-color:#eef0f3;">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <div class="detail-label">Issuer</div><div id="d_issuer" class="detail-value"></div>
+          </div>
+          <div class="flex items-center gap-3 py-3 border-b" style="border-color:#eef0f3;">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div class="detail-label">Remark</div><div id="d_remark" class="detail-value"></div>
+          </div>
+          <div class="flex items-center gap-3 py-3 border-b" style="border-color:#eef0f3;">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <div class="detail-label">วันที่</div><div id="d_date" class="detail-value"></div>
+          </div>
+          <div class="flex items-center gap-3 py-3">
+            <div class="detail-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896a9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div class="detail-label">เวลา</div><div id="d_time" class="detail-value"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ================= APPROVE PAGE ================= -->
+<div id="approvePage" class="hidden min-h-screen" style="background:#f3f5f9;">
+  <div class="topbar-main shadow">
+    <div class="topbar-inner">
+      <div class="topbar-left">
+        <div class="topbar-logo"><i data-lucide="package" class="w-5 h-5 text-[#0f1b2d]"></i></div>
+        <div>
+          <div class="topbar-title">PMN SYSTEM</div>
+          <div class="topbar-sub">Approval Module</div>
+        </div>
+      </div>
+      <button onclick="backToMenu()" class="topbar-btn">← Back</button>
+    </div>
+  </div>
+  <div class="gold-line"></div>
+  <div class="max-w-6xl mx-auto p-6 space-y-6">
+    <div class="bg-white rounded-xl shadow-sm p-5">
+      <div class="mb-3 font-medium text-gray-700 flex items-center gap-2">
+        <i data-lucide="search" class="w-4 h-4 text-gray-500"></i>
+        FILTER & SEARCH
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+        <div>
+          <label class="text-xs text-gray-500">ค้นหา</label>
+          <input id="searchBox" class="w-full border rounded-lg px-3 py-2" placeholder="ชื่อ / รหัส / item">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">Start Date</label>
+          <input type="date" id="f_start" class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500">End Date</label>
+          <input type="date" id="f_end" class="w-full border rounded-lg px-3 py-2">
+        </div>
+        <button onclick="loadPending()" class="h-[40px] px-4 rounded-lg font-medium flex items-center justify-center gap-2" style="background:#f4c542;color:#0f1b2d;">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>โหลดข้อมูล
+        </button>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5">
+      <div class="flex items-center gap-2 mb-4">
+        <i data-lucide="list-checks" class="w-4 h-4 text-gray-500"></i>
+        <div class="font-medium text-gray-700">PENDING ITEMS</div>
+        <div id="countBadge" class="text-xs bg-gray-200 px-2 py-1 rounded-full">0 รายการ</div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b" style="border-bottom:2px solid #f4c542;">
+              <th class="text-left py-2">ID</th>
+              <th class="text-left py-2">EMP</th>
+              <th class="text-left py-2">ITEM</th>
+              <th class="text-left py-2">QTY</th>
+              <th class="text-left py-2">DATE</th>
+              <th class="text-left py-2">STATUS</th>
+              <th class="text-left py-2">ACTION</th>
+            </tr>
+          </thead>
+          <tbody id="approveTable" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="text-center text-xs text-gray-400">© 2026 Stock Management System. All rights reserved.</div>
+  </div>
+</div>
+
+
+<!-- TOAST -->
+<div id="toast" class="fixed top-5 right-5 px-4 py-3 rounded shadow-lg text-white text-sm hidden transition-all duration-300"></div>
+
+<!-- SUCCESS MODAL -->
+<div id="successModal" class="fixed inset-0 hidden flex items-center justify-center z-50" style="background:rgba(15,27,45,0.6);">
+  <div class="bg-white rounded-xl shadow-2xl w-[350px] p-6 text-center" style="border:1px solid rgba(201,168,76,0.2);">
+    <div class="w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-full text-xl font-bold" style="background:rgba(25,135,84,0.1);color:#198754;">✓</div>
+    <h2 class="text-lg font-semibold" style="color:#1a2332;">บันทึกสำเร็จ</h2>
+    <p class="text-sm mt-1" style="color:#8896a9;">รายการถูกบันทึกเรียบร้อยแล้ว</p>
+    <div class="flex gap-2 mt-5">
+      <button onclick="viewReport()" class="flex-1 py-2 rounded text-sm transition" style="border:1px solid #c9a84c;color:#c9a84c;" onmouseover="this.style.background='rgba(201,168,76,0.08)'" onmouseout="this.style.background='transparent'">ดูรายละเอียด</button>
+      <button onclick="backToMenu()" class="flex-1 py-2 rounded text-sm font-semibold" style="background:linear-gradient(135deg,#0f1b2d,#1a2d4a);color:#f0d080;">กลับหน้าหลัก</button>
+    </div>
+  </div>
+</div>
+
+<!-- GLOBAL MODAL -->
+<div id="globalModal" class="modal-overlay fixed inset-0 hidden flex items-center justify-center z-50" style="background:rgba(15,27,45,0.6);">
+  <div class="modal-box bg-white rounded-xl shadow-2xl w-[380px] p-6 text-center" style="border:1px solid rgba(201,168,76,0.2);">
+    <div id="modalIcon" class="w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-full text-xl font-bold"></div>
+    <h2 id="modalTitle" class="text-lg font-semibold text-[#1a2332]"></h2>
+    <p id="modalText" class="text-sm mt-1 text-[#8896a9]"></p>
+    <input id="modalInput" class="hidden w-full mt-3 border rounded px-3 py-2 text-sm" placeholder="กรอกข้อมูล...">
+    <div id="modalActions" class="flex gap-2 mt-5"></div>
+  </div>
+</div>
+
+
+<!-- ================= QR SCANNER MODAL ================= -->
+<div id="qrModal">
+  <div class="qr-box">
+    <button class="qr-close-btn" onclick="closeQR()">✕</button>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:700;color:#f0d080;letter-spacing:1px;text-align:center;">
+        📷 สแกน QR Code
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.4);text-align:center;margin-top:2px;">
+        นำ QR Code เข้าหาเฟรมสีทอง
+      </div>
+    </div>
+
+    <div class="qr-video-wrap">
+      <video
+  id="qrVideo"
+  autoplay
+  playsinline
+  muted
+  webkit-playsinline
+  style="width:100%;border-radius:12px;background:#000;"
+></video>
+      <canvas id="qrCanvas" style="display:none;"></canvas>
+      <div class="qr-frame">
+        <div class="qr-corner tl"></div>
+        <div class="qr-corner tr"></div>
+        <div class="qr-corner bl"></div>
+        <div class="qr-corner br"></div>
+        <div class="qr-scan-line"></div>
+      </div>
+    </div>
+
+    <div id="qrStatus" class="qr-status">กำลังเปิดกล้อง...</div>
+
+    <!-- Manual fallback (shown when camera unavailable) -->
+    <div id="qrManualWrap" style="display:none;margin-top:10px;">
+      <div style="font-size:11px;color:rgba(255,255,255,0.45);text-align:center;margin-bottom:6px;">หรือพิมพ์ Item Code โดยตรง</div>
+      <div style="display:flex;gap:6px;">
+        <input id="qrManualVal" type="text" placeholder="กรอก Item Code..."
+          style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(201,168,76,0.4);background:rgba(255,255,255,0.08);color:#fff;font-size:13px;outline:none;"
+          onkeydown="if(event.key==='Enter') submitQrManual()">
+        <button onclick="submitQrManual()"
+          style="padding:8px 14px;border-radius:8px;background:linear-gradient(135deg,#c9a84c,#f0d080);color:#0f1b2d;font-size:13px;font-weight:700;border:none;cursor:pointer;">ตกลง</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button onclick="closeQR()" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.55);font-size:13px;cursor:pointer;">ยกเลิก</button>
+      <button onclick="switchCamera()" id="switchCamBtn" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(201,168,76,0.4);background:rgba(201,168,76,0.1);color:#f0d080;font-size:13px;cursor:pointer;">🔄 สลับกล้อง</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+let currentData = null;
+let timer;
+let lastKeyword = "";
+let lastSavedData = null;
+let pendingData = [];
+let autoRefreshTimer;
+let todayInputList = [];
+
+// ==================== QR SCANNER ====================
+
+let qrStream = null;
+let qrAnimFrame = null;
+let qrTargetField = null;
+let currentFacing = "environment";
+
+async function openQR(targetFieldId){
+
+  qrTargetField = targetFieldId;
+
+  const modal = document.getElementById("qrModal");
+
+  if(modal){
+    modal.classList.add("active");
+  }
+
+  setQrStatus("กำลังเปิดกล้อง...", "");
+
+  await startCamera();
+}
+////////////////////////////////
+async function startCamera(){
+
+  try{
+
+    const video = document.getElementById("qrVideo");
+
+    // ปิด stream เก่า
+    if(qrStream){
+
+      qrStream.getTracks().forEach(track=>track.stop());
+
+      qrStream = null;
+    }
+
+    // Android-safe constraints
+    const constraints = {
+
+      audio:false,
+
+      video:{
+        facingMode:"environment"
+      }
+    };
+
+    // เปิดกล้อง
+    qrStream = await navigator.mediaDevices.getUserMedia(
+      constraints
+    );
+
+    video.srcObject = qrStream;
+
+    // Mobile fixes
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+
+    video.setAttribute("autoplay", true);
+    video.setAttribute("muted", true);
+    video.setAttribute("playsinline", true);
+    video.setAttribute("webkit-playsinline", true);
+
+    // สำคัญมาก
+    await new Promise(resolve=>{
+
+      video.onloadedmetadata = ()=>{
+
+        resolve();
+      };
+    });
+
+    await video.play();
+
+    setQrStatus("พร้อมสแกน","success");
+
+    document.getElementById(
+      "qrManualWrap"
+    ).style.display = "none";
+
+    scanLoop();
+
+  }catch(err){
+
+    console.error(err);
+
+    let msg = err.message;
+
+    if(err.name === "NotAllowedError"){
+      msg = "Chrome ยังบล็อกกล้อง";
+    }
+
+    if(err.name === "NotReadableError"){
+      msg = "กล้องถูกใช้งานอยู่";
+    }
+
+    if(err.name === "OverconstrainedError"){
+      msg = "อุปกรณ์ไม่รองรับกล้องหลัง";
+    }
+
+    setQrStatus(
+      "เปิดกล้องไม่ได้\n" + msg,
+      "error"
+    );
+
+    document.getElementById(
+      "qrManualWrap"
+    ).style.display = "block";
+  }
+}
+//////////////////
+function scanLoop(){
+
+  const video  = document.getElementById("qrVideo");
+  const canvas = document.getElementById("qrCanvas");
+
+  if(
+    !video ||
+    !canvas
+  ){
+    return;
+  }
+
+  if(
+    video.readyState !== video.HAVE_ENOUGH_DATA
+  ){
+
+    qrAnimFrame =
+      requestAnimationFrame(scanLoop);
+
+    return;
+  }
+
+  const ctx = canvas.getContext("2d");
+
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  ctx.drawImage(video,0,0);
+
+  const imageData = ctx.getImageData(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  if(typeof jsQR !== "function"){
+
+    setQrStatus(
+      "ไม่พบ Library jsQR",
+      "error"
+    );
+
+    return;
+  }
+
+  const code = jsQR(
+    imageData.data,
+    imageData.width,
+    imageData.height
+  );
+
+  if(code){
+
+    handleQrResult(code.data);
+
+    return;
+  }
+
+  qrAnimFrame =
+    requestAnimationFrame(scanLoop);
+}
+
+function handleQrResult(text){
+
+  if(!qrTargetField){
+
+    closeQR();
+
+    return;
+  }
+
+  const input =
+    document.getElementById(qrTargetField);
+
+  if(input){
+
+    input.value = text;
+
+    input.dispatchEvent(
+      new Event("input",{bubbles:true})
+    );
+  }
+
+  if(navigator.vibrate){
+
+    navigator.vibrate(200);
+  }
+
+  closeQR();
+}
+
+function closeQR(){
+
+  const modal =
+    document.getElementById("qrModal");
+
+  if(modal){
+    modal.classList.remove("active");
+  }
+
+  if(qrAnimFrame){
+
+    cancelAnimationFrame(qrAnimFrame);
+
+    qrAnimFrame = null;
+  }
+
+  if(qrStream){
+
+    qrStream.getTracks().forEach(t=>t.stop());
+
+    qrStream = null;
+  }
+}
+
+async function switchCamera(){
+
+  currentFacing =
+    currentFacing === "environment"
+    ? "user"
+    : "environment";
+
+  await startCamera();
+}
+
+function submitQrManual(){
+
+  const input =
+    document.getElementById("qrManualVal");
+
+  if(!input) return;
+
+  const val = input.value.trim();
+
+  if(!val) return;
+
+  handleQrResult(val);
+}
+
+function showPermissionGuide(){
+
+  const el =
+    document.getElementById("permGuide");
+
+  if(el){
+    el.classList.add("active");
+  }
+}
+
+function closePermGuide(){
+
+  const el =
+    document.getElementById("permGuide");
+
+  if(el){
+    el.classList.remove("active");
+  }
+}
+
+async function retryCamera(){
+
+  closePermGuide();
+
+  setQrStatus(
+    "กำลังลองอีกครั้ง...",
+    ""
+  );
+
+  await startCamera();
+}
+
+function setQrStatus(msg,type=""){
+
+  const el =
+    document.getElementById("qrStatus");
+
+  if(!el) return;
+
+  el.style.whiteSpace = "pre-line";
+
+  el.textContent = msg;
+
+  el.className =
+    "qr-status" + (type ? " " + type : "");
+}
+
+// ป้องกัน error ถ้า qrModal ยังไม่โหลด
+window.addEventListener("DOMContentLoaded",()=>{
+
+  const modal =
+    document.getElementById("qrModal");
+
+  if(modal){
+
+    modal.addEventListener(
+      "click",
+      function(e){
+
+        if(e.target === this){
+
+          closeQR();
+        }
+      }
+    );
+  }
+});
+
+// ================= Login ======================
+
+function logoutUser(){
+
+  localStorage.removeItem("pmn_user_email");
+
+  const approveCard =
+    document.getElementById("approveCard");
+
+  if(approveCard){
+    approveCard.style.display = "none";
+  }
+
+  const userEmail =
+    document.getElementById("userEmail");
+
+  if(userEmail){
+    userEmail.innerText = "USER";
+  }
+
+  const issuer =
+    document.getElementById("issuer");
+
+  if(issuer){
+    issuer.value = "";
+  }
+
+  const loginInput =
+    document.getElementById("loginEmailInput");
+
+  if(loginInput){
+    loginInput.value = "";
+  }
+
+  const loginError =
+    document.getElementById("loginError");
+
+  if(loginError){
+    loginError.style.display = "none";
+  }
+
+  const loginModal =
+    document.getElementById("loginModal");
+
+  if(loginModal){
+    loginModal.style.display = "flex";
+  }
+
+  setTimeout(()=>{
+
+    if(loginInput){
+      loginInput.focus();
+    }
+
+  },300);
+}
+
+// ================= NAVIGATION =================
+
+function backToMenu(){
+
+  [
+    "reportPage",
+    "formPage",
+    "detailPage",
+    "approvePage",
+    "inputPage",
+    "successModal"
+  ].forEach(id=>{
+
+    const el = document.getElementById(id);
+
+    if(el){
+      el.classList.add("hidden");
+    }
+  });
+
+  const menu =
+    document.getElementById("menuPage");
+
+  if(menu){
+    menu.classList.remove("hidden");
+  }
+
+  stopAutoRefresh();
+
+  closeQR();
+}
+
+function showReport(){
+
+  document
+    .getElementById("menuPage")
+    ?.classList.add("hidden");
+
+  document
+    .getElementById("reportPage")
+    ?.classList.remove("hidden");
+}
+
+function showForm(){
+
+  document
+    .getElementById("menuPage")
+    ?.classList.add("hidden");
+
+  document
+    .getElementById("formPage")
+    ?.classList.remove("hidden");
+}
+
+function showApprove(){
+
+  document
+    .getElementById("menuPage")
+    ?.classList.add("hidden");
+
+  document
+    .getElementById("approvePage")
+    ?.classList.remove("hidden");
+
+  loadPending();
+
+  startAutoRefresh();
+}
+
+function showInput(){
+
+  document
+    .getElementById("menuPage")
+    ?.classList.add("hidden");
+
+  document
+    .getElementById("inputPage")
+    ?.classList.remove("hidden");
+
+  const savedEmail =
+    localStorage.getItem("pmn_user_email") || "";
+
+  const receiver =
+    document.getElementById("in_receiver");
+
+  if(receiver){
+    receiver.value = savedEmail;
+  }
+
+  if(window.lucide){
+    lucide.createIcons();
+  }
+}
+</script>
+
+<!-- ================= PERMISSION GUIDE MODAL ================= -->
+<div id="permGuide" style="display:none;position:fixed;inset:0;z-index:1100;background:rgba(10,18,32,0.92);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px;">
+<style>
+#permGuide.active { display:flex !important; }
+.pg-box {
+  background:#0f1b2d;
+  border:1px solid rgba(201,168,76,0.35);
+  border-radius:20px;
+  width:100%;
+  max-width:380px;
+  overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,0,0,0.6);
+  animation: qrSlideIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+.pg-header {
+  background:linear-gradient(135deg,rgba(201,168,76,0.15),rgba(201,168,76,0.05));
+  border-bottom:1px solid rgba(201,168,76,0.2);
+  padding:20px 20px 16px;
+  text-align:center;
+}
+.pg-icon-wrap {
+  width:56px;height:56px;
+  border-radius:50%;
+  background:rgba(220,53,69,0.15);
+  border:2px solid rgba(220,53,69,0.4);
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 10px;
+  font-size:26px;
+}
+.pg-title { font-size:15px;font-weight:700;color:#f0d080;margin-bottom:4px; }
+.pg-sub   { font-size:12px;color:rgba(255,255,255,0.45); }
+
+/* OS Tabs */
+.pg-tabs { display:flex;border-bottom:1px solid rgba(255,255,255,0.08); }
+.pg-tab {
+  flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;
+  cursor:pointer;color:rgba(255,255,255,0.4);
+  border-bottom:2px solid transparent;transition:0.2s;
+}
+.pg-tab.active { color:#f0d080;border-bottom-color:#c9a84c; }
+
+.pg-body { padding:18px 20px 20px; }
+.pg-panel { display:none; }
+.pg-panel.active { display:block; }
+
+/* Steps */
+.pg-step {
+  display:flex;gap:12px;align-items:flex-start;
+  margin-bottom:14px;
+}
+.pg-step:last-child { margin-bottom:0; }
+.pg-num {
+  min-width:26px;height:26px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#c9a84c,#f0d080);
+  color:#0f1b2d;
+  font-size:12px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;
+}
+.pg-step-text { font-size:13px;color:rgba(255,255,255,0.75);line-height:1.5; }
+.pg-step-text b { color:#f0d080; }
+.pg-step-text code {
+  background:rgba(201,168,76,0.12);
+  border:1px solid rgba(201,168,76,0.25);
+  border-radius:4px;padding:1px 6px;
+  font-size:11.5px;color:#f0d080;font-family:monospace;
+}
+
+.pg-tip {
+  margin-top:14px;padding:10px 12px;
+  background:rgba(59,130,246,0.08);
+  border:1px solid rgba(59,130,246,0.2);
+  border-radius:8px;
+  font-size:12px;color:rgba(147,197,253,0.9);
+  line-height:1.5;
+}
+
+.pg-actions { display:flex;gap:8px;padding:0 20px 20px; }
+.pg-btn-cancel {
+  flex:1;padding:10px;border-radius:10px;
+  border:1px solid rgba(255,255,255,0.15);
+  background:transparent;color:rgba(255,255,255,0.5);
+  font-size:13px;cursor:pointer;transition:0.2s;
+}
+.pg-btn-cancel:hover { background:rgba(255,255,255,0.06); }
+.pg-btn-retry {
+  flex:2;padding:10px;border-radius:10px;
+  background:linear-gradient(135deg,#c9a84c,#f0d080);
+  color:#0f1b2d;font-size:13px;font-weight:700;
+  border:none;cursor:pointer;transition:0.2s;
+}
+.pg-btn-retry:hover { opacity:0.9; }
+</style>
+
+  <div class="pg-box">
+    <div class="pg-header">
+      <div class="pg-icon-wrap">🔒</div>
+      <div class="pg-title">ไม่มีสิทธิ์เข้าถึงกล้อง</div>
+      <div class="pg-sub">กรุณาอนุญาตตามขั้นตอนด้านล่าง แล้วลองใหม่</div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="pg-tabs">
+      <div class="pg-tab active" id="tabAndroid" onclick="switchPermTab('android')">🤖 Android</div>
+      <div class="pg-tab" id="tabIos" onclick="switchPermTab('ios')">🍎 iPhone / iOS</div>
+    </div>
+
+    <div class="pg-body">
+      <!-- Android Panel -->
+      <div class="pg-panel active" id="panelAndroid">
+        <div class="pg-step">
+          <div class="pg-num">1</div>
+          <div class="pg-step-text">แตะ <b>ไอคอนกุญแจ 🔒</b> หรือ <b>ไอคอน ⓘ</b> ซ้ายบนแถบ URL ของ Chrome</div>
+        </div>
+        <div class="pg-step">
+          <div class="pg-num">2</div>
+          <div class="pg-step-text">เลือก <b>การอนุญาตไซต์</b> (Site permissions / Permissions)</div>
+        </div>
+        <div class="pg-step">
+          <div class="pg-num">3</div>
+          <div class="pg-step-text">แตะ <b>กล้อง</b> (Camera) แล้วเปลี่ยนเป็น <code>อนุญาต</code></div>
+        </div>
+        <div class="pg-step">
+          <div class="pg-num">4</div>
+          <div class="pg-step-text">กด <b>"ลองอีกครั้ง"</b> ด้านล่าง</div>
+        </div>
+        <div class="pg-tip">💡 หากไม่เห็นไอคอน ให้แตะที่ URL แล้วกดปุ่ม ⋮ เพื่อดูการตั้งค่า</div>
+      </div>
+
+      <!-- iOS Panel -->
+      <div class="pg-panel" id="panelIos">
+        <div class="pg-step">
+          <div class="pg-num">1</div>
+          <div class="pg-step-text">เปิด <b>Settings</b> (การตั้งค่า) บน iPhone</div>
+        </div>
+        <div class="pg-step">
+          <div class="pg-num">2</div>
+          <div class="pg-step-text">เลื่อนลงหา <b>Safari</b> แล้วแตะเข้าไป</div>
+        </div>
+        <div class="pg-step">
+          <div class="pg-num">3</div>
+          <div class="pg-step-text">ใต้หัวข้อ <b>Settings for Websites</b> → แตะ <b>Camera</b></div>
+        </div>
+        <div class="pg-step">
+          <div class="pg-num">4</div>
+          <div class="pg-step-text">เปลี่ยนเป็น <code>Allow</code> แล้วกลับมากด <b>"ลองอีกครั้ง"</b></div>
+        </div>
+        <div class="pg-tip">💡 ถ้าใช้ Chrome บน iOS: Settings → Chrome → Camera → เปิดสิทธิ์</div>
+      </div>
+    </div>
+
+    <div class="pg-actions">
+      <button class="pg-btn-cancel" onclick="closePermGuide()">ปิด</button>
+      <button class="pg-btn-retry" onclick="retryCamera()">🔄 ลองอีกครั้ง</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchPermTab(os) {
+  document.getElementById("tabAndroid").classList.toggle("active", os === "android");
+  document.getElementById("tabIos").classList.toggle("active", os === "ios");
+  document.getElementById("panelAndroid").classList.toggle("active", os === "android");
+  document.getElementById("panelIos").classList.toggle("active", os === "ios");
+}
+async function retryCamera() {
+  closePermGuide();
+  setQrStatus("กำลังลองเปิดกล้องอีกครั้ง...", "");
+  hideQrManualInput();
+  camChainIdx = 0;
+  await tryNextCamera();
+}
+</script>
+
+</body>
+</html>
