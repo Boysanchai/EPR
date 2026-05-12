@@ -1,13 +1,8 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
- 
 <meta charset="UTF-8">
-<meta name="viewport"
-content="width=device-width,initial-scale=1,viewport-fit=cover">
-
-<meta http-equiv="Permissions-Policy"
-content="camera=*, microphone=*">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -15,7 +10,6 @@ content="camera=*, microphone=*">
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=LINE+Seed+Sans+TH:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-
 
 <style>
 :root {
@@ -902,25 +896,29 @@ h1, h2, h3, .font-semibold, .font-bold {
 
 
 <script>
-const API_URL =
-"https://script.google.com/macros/s/AKfycbx2N1RJiS8fKTA9jyBYyLa9D0GIQx052JdIoVnTngATlYxo6nJsh9hhWOz2O2ZQIa8f/exec";
 
-async function callAPI(action, data = {}) {
+const API_URL = "https://script.google.com/macros/s/AKfycbxXemaC6QHGsEwN5RpxUkFkm32OcAth_OxLxxsNb5m-VKR5d1WgHUqejrCgjG4dZ-KN/exec";
 
-  const res = await fetch(API_URL, {
+// ======================================================
+// API FETCH
+// ======================================================
+
+async function api(action, payload = {}) {
+
+  const response = await fetch(API_URL, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "text/plain;charset=utf-8"
     },
     body: JSON.stringify({
       action,
-      ...data
+      ...payload
     })
   });
 
-  return await res.json();
+  return await response.json();
 }
- 
+
 let currentData = null;
 let timer;
 let lastKeyword = "";
@@ -934,470 +932,691 @@ let todayInputList = [];
 let qrStream = null;
 let qrAnimFrame = null;
 let qrTargetField = null;
-let currentFacing = "environment";
+let barcodeDetector = null;
 
-async function openQR(targetFieldId){
+const hasBarcodeDetector = 'BarcodeDetector' in window;
+
+// ======================================================
+// QR
+// ======================================================
+
+async function openQR(targetFieldId) {
 
   qrTargetField = targetFieldId;
 
-  const modal = document.getElementById("qrModal");
-
-  if(modal){
-    modal.classList.add("active");
-  }
+  document.getElementById("qrModal").classList.add("active");
 
   setQrStatus("กำลังเปิดกล้อง...", "");
 
+  if (hasBarcodeDetector) {
+    barcodeDetector = new BarcodeDetector({
+      formats: ['qr_code']
+    });
+  }
+
   await startCamera();
 }
-////////////////////////////////
-async function startCamera(){
 
-  try{
+async function switchCamera() {
+
+  stopCamera();
+
+  try {
+
+    const current = qrStream?.getVideoTracks()[0]?.getSettings()?.facingMode;
+
+    const next = current === "user"
+      ? "environment"
+      : "user";
+
+    qrStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: {
+          ideal: next
+        }
+      },
+      audio: false
+    });
 
     const video = document.getElementById("qrVideo");
 
-    // ปิด stream เก่า
-    if(qrStream){
-
-      qrStream.getTracks().forEach(track=>track.stop());
-
-      qrStream = null;
-    }
-
-    // Android-safe constraints
-    const constraints = {
-
-      audio:false,
-
-      video:{
-        facingMode:"environment"
-      }
-    };
-
-    // เปิดกล้อง
-    qrStream = await navigator.mediaDevices.getUserMedia(
-      constraints
-    );
-
     video.srcObject = qrStream;
 
-    // Mobile fixes
     video.muted = true;
-    video.autoplay = true;
-    video.playsInline = true;
 
-    video.setAttribute("autoplay", true);
-    video.setAttribute("muted", true);
-    video.setAttribute("playsinline", true);
-    video.setAttribute("webkit-playsinline", true);
+    try {
+      await video.play();
+    } catch(e){}
 
-    // สำคัญมาก
-    await new Promise(resolve=>{
+    scanFrame();
 
-      video.onloadedmetadata = ()=>{
+  } catch(e) {
 
-        resolve();
-      };
-    });
+    setQrStatus("สลับกล้องไม่สำเร็จ", "error");
 
-    await video.play();
-
-    setQrStatus("พร้อมสแกน","success");
-
-    document.getElementById(
-      "qrManualWrap"
-    ).style.display = "none";
-
-    scanLoop();
-
-  }catch(err){
-
-    console.error(err);
-
-    let msg = err.message;
-
-    if(err.name === "NotAllowedError"){
-      msg = "Chrome ยังบล็อกกล้อง";
-    }
-
-    if(err.name === "NotReadableError"){
-      msg = "กล้องถูกใช้งานอยู่";
-    }
-
-    if(err.name === "OverconstrainedError"){
-      msg = "อุปกรณ์ไม่รองรับกล้องหลัง";
-    }
-
-    setQrStatus(
-      "เปิดกล้องไม่ได้\n" + msg,
-      "error"
-    );
-
-    document.getElementById(
-      "qrManualWrap"
-    ).style.display = "block";
   }
 }
-//////////////////
-function scanLoop(){
 
-  const video  = document.getElementById("qrVideo");
-  const canvas = document.getElementById("qrCanvas");
+async function scanFrame() {
 
-  if(
-    !video ||
-    !canvas
-  ){
+  const video = document.getElementById("qrVideo");
+
+  if (!video || !qrStream) return;
+
+  if (video.readyState < 2 || video.videoWidth === 0) {
+    qrAnimFrame = requestAnimationFrame(scanFrame);
     return;
   }
 
-  if(
-    video.readyState !== video.HAVE_ENOUGH_DATA
-  ){
+  try {
 
-    qrAnimFrame =
-      requestAnimationFrame(scanLoop);
+    if (hasBarcodeDetector && barcodeDetector) {
 
-    return;
-  }
+      const codes = await barcodeDetector.detect(video);
 
-  const ctx = canvas.getContext("2d");
+      if (codes.length > 0) {
+        onQRFound(codes[0].rawValue);
+        return;
+      }
 
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
+    } else {
 
-  ctx.drawImage(video,0,0);
+      const canvas = document.getElementById("qrCanvas");
 
-  const imageData = ctx.getImageData(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-  );
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-  if(typeof jsQR !== "function"){
+      const ctx = canvas.getContext("2d");
 
-    setQrStatus(
-      "ไม่พบ Library jsQR",
-      "error"
-    );
+      ctx.drawImage(video, 0, 0);
 
-    return;
-  }
+      const imageData = ctx.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
 
-  const code = jsQR(
-    imageData.data,
-    imageData.width,
-    imageData.height
-  );
+      const code = jsQR(
+        imageData.data,
+        imageData.width,
+        imageData.height,
+        {
+          inversionAttempts: "attemptBoth"
+        }
+      );
 
-  if(code){
+      if (code && code.data) {
+        onQRFound(code.data);
+        return;
+      }
+    }
 
-    handleQrResult(code.data);
+  } catch(e){}
 
-    return;
-  }
-
-  qrAnimFrame =
-    requestAnimationFrame(scanLoop);
+  qrAnimFrame = requestAnimationFrame(scanFrame);
 }
 
-function handleQrResult(text){
+function onQRFound(value) {
 
-  if(!qrTargetField){
+  setQrStatus("✓ พบ QR: " + value, "success");
 
+  if (qrTargetField) {
+
+    const field = document.getElementById(qrTargetField);
+
+    if (field) {
+
+      field.value = value.trim();
+
+      if (qrTargetField === "in_itemCode") {
+        searchInputItem("code");
+      } else if (qrTargetField === "itemCode") {
+        searchItemClient("code");
+      }
+    }
+  }
+
+  setTimeout(() => {
     closeQR();
-
-    return;
-  }
-
-  const input =
-    document.getElementById(qrTargetField);
-
-  if(input){
-
-    input.value = text;
-
-    input.dispatchEvent(
-      new Event("input",{bubbles:true})
-    );
-  }
-
-  if(navigator.vibrate){
-
-    navigator.vibrate(200);
-  }
-
-  closeQR();
+  }, 800);
 }
 
-function closeQR(){
+function closeQR() {
 
-  const modal =
-    document.getElementById("qrModal");
+  stopCamera();
 
-  if(modal){
-    modal.classList.remove("active");
-  }
+  document.getElementById("qrModal").classList.remove("active");
 
-  if(qrAnimFrame){
+  setQrStatus("", "");
 
-    cancelAnimationFrame(qrAnimFrame);
-
-    qrAnimFrame = null;
-  }
-
-  if(qrStream){
-
-    qrStream.getTracks().forEach(t=>t.stop());
-
-    qrStream = null;
-  }
+  qrTargetField = null;
 }
 
-async function switchCamera(){
+function setQrStatus(msg, type) {
 
-  currentFacing =
-    currentFacing === "environment"
-    ? "user"
-    : "environment";
-
-  await startCamera();
-}
-
-function submitQrManual(){
-
-  const input =
-    document.getElementById("qrManualVal");
-
-  if(!input) return;
-
-  const val = input.value.trim();
-
-  if(!val) return;
-
-  handleQrResult(val);
-}
-
-function showPermissionGuide(){
-
-  const el =
-    document.getElementById("permGuide");
-
-  if(el){
-    el.classList.add("active");
-  }
-}
-
-function closePermGuide(){
-
-  const el =
-    document.getElementById("permGuide");
-
-  if(el){
-    el.classList.remove("active");
-  }
-}
-
-async function retryCamera(){
-
-  closePermGuide();
-
-  setQrStatus(
-    "กำลังลองอีกครั้ง...",
-    ""
-  );
-
-  await startCamera();
-}
-
-function setQrStatus(msg,type=""){
-
-  const el =
-    document.getElementById("qrStatus");
-
-  if(!el) return;
-
-  el.style.whiteSpace = "pre-line";
+  const el = document.getElementById("qrStatus");
 
   el.textContent = msg;
 
-  el.className =
-    "qr-status" + (type ? " " + type : "");
+  el.className = "qr-status" + (type ? " " + type : "");
 }
 
-// ป้องกัน error ถ้า qrModal ยังไม่โหลด
-window.addEventListener("DOMContentLoaded",()=>{
+// ======================================================
+// LOGIN
+// ======================================================
 
-  const modal =
-    document.getElementById("qrModal");
-
-  if(modal){
-
-    modal.addEventListener(
-      "click",
-      function(e){
-
-        if(e.target === this){
-
-          closeQR();
-        }
-      }
-    );
-  }
-});
-
-// ================= Login ======================
-
-function logoutUser(){
+function logoutUser() {
 
   localStorage.removeItem("pmn_user_email");
 
-  const approveCard =
-    document.getElementById("approveCard");
+  document.getElementById("approveCard").style.display = "none";
 
-  if(approveCard){
-    approveCard.style.display = "none";
-  }
+  document.getElementById("userEmail").innerText = "USER";
 
-  const userEmail =
-    document.getElementById("userEmail");
+  document.getElementById("issuer").value = "";
 
-  if(userEmail){
-    userEmail.innerText = "USER";
-  }
+  document.getElementById("loginEmailInput").value = "";
 
-  const issuer =
-    document.getElementById("issuer");
+  document.getElementById("loginError").style.display = "none";
 
-  if(issuer){
-    issuer.value = "";
-  }
+  document.getElementById("loginModal").style.display = "flex";
 
-  const loginInput =
-    document.getElementById("loginEmailInput");
-
-  if(loginInput){
-    loginInput.value = "";
-  }
-
-  const loginError =
-    document.getElementById("loginError");
-
-  if(loginError){
-    loginError.style.display = "none";
-  }
-
-  const loginModal =
-    document.getElementById("loginModal");
-
-  if(loginModal){
-    loginModal.style.display = "flex";
-  }
-
-  setTimeout(()=>{
-
-    if(loginInput){
-      loginInput.focus();
-    }
-
-  },300);
+  setTimeout(() => {
+    document.getElementById("loginEmailInput").focus();
+  }, 300);
 }
 
-// ================= NAVIGATION =================
+function submitLoginEmail() {
 
-function backToMenu(){
+  const input = document.getElementById("loginEmailInput");
 
-  [
-    "reportPage",
-    "formPage",
-    "detailPage",
-    "approvePage",
-    "inputPage",
-    "successModal"
-  ].forEach(id=>{
+  const email = input.value.trim().toLowerCase();
 
-    const el = document.getElementById(id);
+  if (!email.includes("@") || !email.includes(".")) {
 
-    if(el){
-      el.classList.add("hidden");
-    }
-  });
+    document.getElementById("loginError").style.display = "block";
 
-  const menu =
-    document.getElementById("menuPage");
-
-  if(menu){
-    menu.classList.remove("hidden");
+    return;
   }
+
+  document.getElementById("loginError").style.display = "none";
+
+  document.getElementById("loginModal").style.display = "none";
+
+  localStorage.setItem("pmn_user_email", email);
+
+  applyUserEmail(email);
+
+  const name = email.split("@")[0];
+
+  showModal({
+    title: "เข้าสู่ระบบสำเร็จ",
+    text: `ยินดีต้อนรับ ${name} 👋`,
+    type: "success",
+    autoClose: 1800
+  });
+}
+
+function applyUserEmail(email) {
+
+  const display = email
+    ? email.split("@")[0]
+    : "USER";
+
+  document.getElementById("userEmail").innerText = display;
+
+  document.getElementById("issuer").value = email;
+
+  const APPROVE_WHITELIST = [
+    "boysanchai90@gmail.com",
+    
+  ];
+
+  const allowed = APPROVE_WHITELIST.map(
+    e => e.toLowerCase().trim()
+  );
+
+  if (allowed.includes(email.toLowerCase().trim())) {
+    document.getElementById("approveCard").style.display = "block";
+  }
+}
+
+// ======================================================
+// NAVIGATION
+// ======================================================
+
+function backToMenu() {
+
+  document.getElementById("reportPage").classList.add("hidden");
+  document.getElementById("formPage").classList.add("hidden");
+  document.getElementById("detailPage").classList.add("hidden");
+  document.getElementById("approvePage").classList.add("hidden");
+  document.getElementById("inputPage").classList.add("hidden");
+
+  document.getElementById("menuPage").classList.remove("hidden");
 
   stopAutoRefresh();
-
-  closeQR();
 }
 
-function showReport(){
+function showReport() {
 
-  document
-    .getElementById("menuPage")
-    ?.classList.add("hidden");
+  document.getElementById("menuPage").classList.add("hidden");
 
-  document
-    .getElementById("reportPage")
-    ?.classList.remove("hidden");
+  document.getElementById("reportPage").classList.remove("hidden");
 }
 
-function showForm(){
+function showForm() {
 
-  document
-    .getElementById("menuPage")
-    ?.classList.add("hidden");
+  document.getElementById("menuPage").classList.add("hidden");
 
-  document
-    .getElementById("formPage")
-    ?.classList.remove("hidden");
+  document.getElementById("formPage").classList.remove("hidden");
 }
 
-function showApprove(){
+function showApprove() {
 
-  document
-    .getElementById("menuPage")
-    ?.classList.add("hidden");
+  document.getElementById("menuPage").classList.add("hidden");
 
-  document
-    .getElementById("approvePage")
-    ?.classList.remove("hidden");
+  document.getElementById("approvePage").classList.remove("hidden");
 
   loadPending();
 
   startAutoRefresh();
 }
 
-function showInput(){
+function showInput() {
 
-  document
-    .getElementById("menuPage")
-    ?.classList.add("hidden");
+  document.getElementById("menuPage").classList.add("hidden");
 
-  document
-    .getElementById("inputPage")
-    ?.classList.remove("hidden");
+  document.getElementById("inputPage").classList.remove("hidden");
 
   const savedEmail =
     localStorage.getItem("pmn_user_email") || "";
 
-  const receiver =
-    document.getElementById("in_receiver");
-
-  if(receiver){
-    receiver.value = savedEmail;
-  }
-
-  if(window.lucide){
-    lucide.createIcons();
-  }
+  document.getElementById("in_receiver").value = savedEmail;
 }
+
+// ======================================================
+// SEARCH ITEM INPUT
+// ======================================================
+
+async function searchInputItem(type) {
+
+  clearTimeout(timer);
+
+  timer = setTimeout(async () => {
+
+    const keyword = type === "code"
+      ? document.getElementById("in_itemCode").value.trim()
+      : document.getElementById("in_itemName").value.trim();
+
+    if (keyword.length < 3) return;
+
+    const list = await api("searchItem", {
+      keyword
+    });
+
+    if (!list || list.length === 0) return;
+
+    document.getElementById("in_itemCode").value = list[0].code;
+
+    document.getElementById("in_itemName").value = list[0].name;
+
+    const spec = document.getElementById("in_spec");
+
+    spec.innerHTML = "";
+
+    list.forEach(i => {
+
+      let opt = document.createElement("option");
+
+      opt.value = i.spec;
+
+      opt.text = i.spec;
+
+      spec.appendChild(opt);
+
+    });
+
+  }, 350);
+}
+
+// ======================================================
+// SAVE STOCK IN
+// ======================================================
+
+async function saveInput() {
+
+  const data = {
+    itemCode: document.getElementById("in_itemCode").value.trim(),
+    itemName: document.getElementById("in_itemName").value.trim(),
+    spec: document.getElementById("in_spec").value,
+    qty: document.getElementById("in_qty").value.trim(),
+    receiver: document.getElementById("in_receiver").value.trim(),
+    ref: document.getElementById("in_ref").value.trim(),
+    remark: document.getElementById("in_remark").value.trim()
+  };
+
+  if (!data.itemCode || !data.qty) {
+
+    showModal({
+      title: "ข้อมูลไม่ครบ",
+      text: "กรุณากรอกข้อมูล",
+      type: "error"
+    });
+
+    return;
+  }
+
+  const btn = document.getElementById("saveInputBtn");
+
+  btn.disabled = true;
+
+  btn.innerText = "Saving...";
+
+  try {
+
+    const res = await api("saveStockIn", {
+      data
+    });
+
+    const now = new Date();
+
+    todayInputList.unshift({
+      ...data,
+      time: res.time || now.toLocaleTimeString("th-TH"),
+      date: res.date || now.toLocaleDateString("th-TH")
+    });
+
+    renderInputTable();
+
+    clearInputForm();
+
+    showModal({
+      title: "บันทึกสำเร็จ",
+      text: `รับ ${data.itemName} เข้าคลังแล้ว`,
+      type: "success",
+      autoClose: 1800
+    });
+
+  } catch(err) {
+
+    showModal({
+      title: "เกิดข้อผิดพลาด",
+      text: err.message,
+      type: "error"
+    });
+
+  }
+
+  btn.disabled = false;
+
+  btn.innerText = "บันทึกรับเข้า";
+}
+
+// ======================================================
+// EMPLOYEE
+// ======================================================
+
+async function fetchEmpName() {
+
+  clearTimeout(timer);
+
+  timer = setTimeout(async () => {
+
+    const empId =
+      document.getElementById("empId").value.trim();
+
+    if (!empId) {
+      document.getElementById("empName").value = "";
+      return;
+    }
+
+    const name = await api("getEmployeeName", {
+      empId
+    });
+
+    document.getElementById("empName").value = name || "";
+
+  }, 300);
+}
+
+// ======================================================
+// SEARCH ITEM
+// ======================================================
+
+async function searchItemClient(type) {
+
+  clearTimeout(timer);
+
+  timer = setTimeout(async () => {
+
+    let keyword = type === "code"
+      ? document.getElementById("itemCode").value.trim()
+      : document.getElementById("itemName").value.trim();
+
+    if (keyword.length < 3) return;
+
+    lastKeyword = keyword;
+
+    const list = await api("searchItem", {
+      keyword
+    });
+
+    if (keyword !== lastKeyword) return;
+
+    if (!list || list.length === 0) return;
+
+    document.getElementById("itemCode").value = list[0].code;
+
+    document.getElementById("itemName").value = list[0].name;
+
+    const spec = document.getElementById("spec");
+
+    spec.innerHTML = "";
+
+    list.forEach(i => {
+
+      let opt = document.createElement("option");
+
+      opt.value = i.spec;
+
+      opt.text = i.spec;
+
+      spec.appendChild(opt);
+
+    });
+
+  }, 350);
+}
+
+// ======================================================
+// SAVE DATA
+// ======================================================
+
+async function saveData() {
+
+  const data = {
+    empId: document.getElementById('empId').value.trim(),
+    empName: document.getElementById('empName').value.trim(),
+    itemCode: document.getElementById('itemCode').value.trim(),
+    itemName: document.getElementById('itemName').value.trim(),
+    spec: document.getElementById('spec').value,
+    qty: document.getElementById('qty').value.trim(),
+    issuer: document.getElementById('issuer').value.trim(),
+    remark: document.getElementById('remark').value.trim()
+  };
+
+  if (!data.empId || !data.itemCode || !data.qty) {
+
+    showModal({
+      title:"ข้อมูลไม่ครบ",
+      text:"กรุณากรอกข้อมูล",
+      type:"error"
+    });
+
+    return;
+  }
+
+  const btn = document.getElementById("saveBtn");
+
+  btn.innerText = "Saving...";
+
+  btn.disabled = true;
+
+  try {
+
+    await api("saveStock", {
+      data
+    });
+
+    lastSavedData = data;
+
+    showSuccessModal();
+
+    clearForm();
+
+  } catch(err) {
+
+    showModal({
+      title:"เกิดข้อผิดพลาด",
+      text:err.message,
+      type:"error"
+    });
+
+  }
+
+  btn.innerText = "Save Transaction";
+
+  btn.disabled = false;
+}
+
+// ======================================================
+// REPORT
+// ======================================================
+
+async function generate() {
+
+  const start = document.getElementById('start').value;
+
+  const end = document.getElementById('end').value;
+
+  const source =
+    document.getElementById('sourceFilter').value;
+
+  const btn = document.getElementById('btn');
+
+  btn.innerText = "Processing...";
+
+  btn.disabled = true;
+
+  const data = await api("getReportData", {
+    startDate: start,
+    endDate: end,
+    sourceFilter: source
+  });
+
+  currentData = data;
+
+  btn.innerText = "Generate";
+
+  btn.disabled = false;
+}
+
+// ======================================================
+// APPROVE
+// ======================================================
+
+function stopAutoRefresh() {
+  clearInterval(autoRefreshTimer);
+}
+
+function startAutoRefresh() {
+  autoRefreshTimer = setInterval(loadPending, 5000);
+}
+
+async function loadPending() {
+
+  const res = await api("getPendingList");
+
+  if (!res.success) {
+
+    showModal({
+      title:"เกิดข้อผิดพลาด",
+      text:res.message,
+      type:"error"
+    });
+
+    return;
+  }
+
+  pendingData = res.rows;
+
+  renderTable();
+}
+
+async function approve(id) {
+
+  await api("approveTransaction", {
+    txId: id
+  });
+
+  showModal({
+    title:"อนุมัติสำเร็จ",
+    text:"รายการได้รับการอนุมัติเรียบร้อยแล้ว",
+    type:"success",
+    autoClose:1000
+  });
+
+  loadPending();
+}
+
+async function reject(id) {
+
+  const reason = prompt("เหตุผลที่ไม่อนุมัติ");
+
+  if (reason === null) return;
+
+  await api("rejectTransaction", {
+    txId: id,
+    reason
+  });
+
+  showModal({
+    title:"ไม่อนุมัติสำเร็จ",
+    text:"รายการถูกปฏิเสธเรียบร้อยแล้ว",
+    type:"error",
+    autoClose:1000
+  });
+
+  loadPending();
+}
+
+// ======================================================
+// LOAD
+// ======================================================
+
+window.onload = () => {
+
+  const savedEmail =
+    localStorage.getItem("pmn_user_email");
+
+  if (savedEmail && savedEmail.includes("@")) {
+
+    applyUserEmail(savedEmail);
+
+  } else {
+
+    document.getElementById("loginModal").style.display = "flex";
+
+    setTimeout(() => {
+
+      document.getElementById("loginEmailInput").focus();
+
+    }, 300);
+  }
+};
+
 </script>
 
 <!-- ================= PERMISSION GUIDE MODAL ================= -->
@@ -1573,51 +1792,7 @@ async function retryCamera() {
   camChainIdx = 0;
   await tryNextCamera();
 }
-
- async function submitLoginEmail() {
-
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-
-  try {
-
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify({
-        action: "login",
-        email: email,
-        password: password
-      })
-    });
-
-    const result = await res.json();
-
-    if (result.success) {
-
-      alert("Login success");
-
-      localStorage.setItem("user", JSON.stringify(result.user));
-
-      location.href = "dashboard.html";
-
-    } else {
-
-      alert(result.message || "Login failed");
-
-    }
-
-  } catch (err) {
-
-    console.error(err);
-    alert("Connection error");
-
-  }
-}
 </script>
-
 
 </body>
 </html>
