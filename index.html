@@ -987,7 +987,6 @@ async function openQR(targetFieldId) {
   await startCamera();
 }
 
-
 // ======================================================
 // START CAMERA
 // ======================================================
@@ -996,21 +995,72 @@ async function startCamera() {
 
   try {
 
+    if (!navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia) {
+
+      setQrStatus(
+        "Browser ไม่รองรับ Camera",
+        "error"
+      );
+
+      return;
+    }
+
     const video =
-      document.getElementById("qrVideo");
+      document.getElementById(
+        "qrVideo"
+      );
 
-    qrStream =
-      await navigator.mediaDevices.getUserMedia({
+    if (!video) {
 
-        video: {
-          facingMode: {
-            ideal: "environment"
-          }
-        },
+      setQrStatus(
+        "ไม่พบ video element",
+        "error"
+      );
 
-        audio: false
+      return;
+    }
 
-      });
+    // ปิด stream เก่า
+
+    stopCamera();
+
+    // ลองเปิดกล้องหลัง
+
+    try {
+
+      qrStream =
+        await navigator
+          .mediaDevices
+          .getUserMedia({
+
+            video: {
+              facingMode: {
+                ideal: "environment"
+              }
+            },
+
+            audio: false
+          });
+
+    } catch(err) {
+
+      console.log(
+        "เปิดกล้องหลังไม่ได้",
+        err
+      );
+
+      // fallback กล้องหน้า
+
+      qrStream =
+        await navigator
+          .mediaDevices
+          .getUserMedia({
+
+            video: true,
+            audio: false
+          });
+    }
 
     video.srcObject = qrStream;
 
@@ -1019,7 +1069,14 @@ async function startCamera() {
       true
     );
 
+    video.muted = true;
+
     await video.play();
+
+    setQrStatus(
+      "เปิดกล้องสำเร็จ",
+      "success"
+    );
 
     scanFrame();
 
@@ -1028,12 +1085,12 @@ async function startCamera() {
     console.error(err);
 
     setQrStatus(
-      "เปิดกล้องไม่ได้ กรุณาอนุญาต Camera",
+      "เปิดกล้องไม่ได้ : " +
+      err.message,
       "error"
     );
   }
 }
-
 
 // ======================================================
 // STOP CAMERA
@@ -1046,19 +1103,27 @@ function stopCamera() {
     cancelAnimationFrame(
       qrAnimFrame
     );
+
+    qrAnimFrame = null;
   }
 
   if (qrStream) {
 
     qrStream
       .getTracks()
-      .forEach(track => track.stop());
+      .forEach(track => {
+
+        track.stop();
+
+      });
 
     qrStream = null;
   }
 
   const video =
-    document.getElementById("qrVideo");
+    document.getElementById(
+      "qrVideo"
+    );
 
   if (video) {
 
@@ -1067,7 +1132,6 @@ function stopCamera() {
     video.srcObject = null;
   }
 }
-
 
 // ======================================================
 // SWITCH CAMERA
@@ -1908,6 +1972,80 @@ function showInput() {
   }
 }
 
+  // ======================================================
+// LOGOUT
+// ======================================================
+
+function logoutUser() {
+
+  localStorage.removeItem(
+    "pmn_user_email"
+  );
+
+  const approveCard =
+    document.getElementById(
+      "approveCard"
+    );
+
+  if (approveCard) {
+    approveCard.style.display = "none";
+  }
+
+  const userEmail =
+    document.getElementById(
+      "userEmail"
+    );
+
+  if (userEmail) {
+    userEmail.innerText = "USER";
+  }
+
+  const issuer =
+    document.getElementById(
+      "issuer"
+    );
+
+  if (issuer) {
+    issuer.value = "";
+  }
+
+  const loginInput =
+    document.getElementById(
+      "loginEmailInput"
+    );
+
+  if (loginInput) {
+    loginInput.value = "";
+  }
+
+  const loginError =
+    document.getElementById(
+      "loginError"
+    );
+
+  if (loginError) {
+    loginError.style.display = "none";
+  }
+
+  const loginModal =
+    document.getElementById(
+      "loginModal"
+    );
+
+  if (loginModal) {
+    loginModal.style.display = "flex";
+  }
+
+  setTimeout(() => {
+
+    if (loginInput) {
+      loginInput.focus();
+    }
+
+  }, 300);
+}
+
+
 </script>
 
 <!-- ================= PERMISSION GUIDE MODAL ================= -->
@@ -2303,6 +2441,33 @@ document.addEventListener("DOMContentLoaded", () => {
 window.addEventListener("load", () => {
   if (window.lucide) lucide.createIcons();
 });
+
+
+  <div id="qrModal" class="qr-modal">
+
+  <div class="qr-box">
+
+    <video
+      id="qrVideo"
+      autoplay
+      playsinline
+      muted
+    ></video>
+
+    <canvas
+      id="qrCanvas"
+      style="display:none;"
+    ></canvas>
+
+    <div id="qrStatus"></div>
+
+    <button onclick="closeQR()">
+      ปิด
+    </button>
+
+  </div>
+
+</div>
 </script>
  
 </body>
