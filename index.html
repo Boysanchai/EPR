@@ -1452,8 +1452,17 @@ window.onload = () => {
 };
 
 
+// ======================================================
+// QR VARIABLES
+// ======================================================
+let qrStream = null;
+let qrAnimFrame = null;
+let qrTargetField = null;
+let barcodeDetector = null;
+const hasBarcodeDetector = 'BarcodeDetector' in window;
 let currentFacingMode = "environment";
 let currentTrack = null;
+let scanRunning = false;
 
 async function openQR(targetFieldId) {
 
@@ -1551,20 +1560,22 @@ scanFrame();
 
 } catch(err) {
 
-console.error(err);
+console.error("Camera error:", err);
 
 setQrStatus(
 "เปิดกล้องไม่ได้\nกรุณาอนุญาต Camera",
 "error"
 );
 
-alert(
-"เปิดกล้องไม่ได้\n\n" +
-"1. อนุญาต Camera\n" +
-"2. เปิดผ่าน HTTPS\n" +
-"3. ห้ามเปิดผ่าน LINE\n\n" +
-err.message
-);
+// แสดง manual input fallback
+const mw = document.getElementById("qrManualWrap");
+if (mw) mw.style.display = "block";
+
+// แสดง permission guide ถ้าเป็น permission error
+if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+  const pg = document.getElementById("permGuide");
+  if (pg) pg.classList.add("active");
+}
 }
 }
 
