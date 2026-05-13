@@ -906,7 +906,7 @@ transform:scale(.98);
 
 <script>
 
-const API_URL = "YOUR_WEBAPP_URL";
+const API_URL = "https://script.google.com/macros/s/AKfycbxxUrgOOAtyp0X9YQHIQFewT11Ed53tEtbrOKd2WI7BOkkCuwZvl9xIbOFfqvEvSqiL/exec";
 
 // ======================================================
 // API
@@ -914,18 +914,33 @@ const API_URL = "YOUR_WEBAPP_URL";
 
 async function api(action, payload = {}) {
 
-  const response = await fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8"
-    },
-    body: JSON.stringify({
-      action,
-      ...payload
-    })
-  });
+  try {
 
-  return await response.json();
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        action,
+        ...payload
+      })
+    });
+
+    return await response.json();
+
+  } catch(err) {
+
+    console.error(err);
+
+    showModal({
+      title: "Network Error",
+      text: err.message,
+      type: "error"
+    });
+
+    throw err;
+  }
 }
 
 // ======================================================
@@ -940,12 +955,19 @@ let pendingData = [];
 let autoRefreshTimer;
 let todayInputList = [];
 
+
+// ======================================================
+// QR SCANNER
+// ======================================================
+
 let qrStream = null;
 let qrAnimFrame = null;
 let qrTargetField = null;
 let barcodeDetector = null;
 
-const hasBarcodeDetector = "BarcodeDetector" in window;
+const hasBarcodeDetector =
+  'BarcodeDetector' in window;
+
 
 // ======================================================
 // OPEN QR
@@ -966,12 +988,13 @@ async function openQR(targetFieldId) {
 
     barcodeDetector =
       new BarcodeDetector({
-        formats: ["qr_code"]
+        formats: ['qr_code']
       });
   }
 
   await startCamera();
 }
+
 
 // ======================================================
 // START CAMERA
@@ -1018,6 +1041,7 @@ async function startCamera() {
   }
 }
 
+
 // ======================================================
 // STOP CAMERA
 // ======================================================
@@ -1048,6 +1072,7 @@ function stopCamera() {
   }
 }
 
+
 // ======================================================
 // SWITCH CAMERA
 // ======================================================
@@ -1073,11 +1098,15 @@ async function switchCamera() {
 
     video.srcObject = qrStream;
 
+    video.muted = true;
+
     await video.play();
 
     scanFrame();
 
-  } catch(e) {
+  } catch(err) {
+
+    console.error(err);
 
     setQrStatus(
       "สลับกล้องไม่สำเร็จ",
@@ -1085,6 +1114,7 @@ async function switchCamera() {
     );
   }
 }
+
 
 // ======================================================
 // SCAN FRAME
@@ -1134,14 +1164,14 @@ async function scanFrame() {
       const canvas =
         document.getElementById("qrCanvas");
 
+      const ctx =
+        canvas.getContext("2d");
+
       canvas.width =
         video.videoWidth;
 
       canvas.height =
         video.videoHeight;
-
-      const ctx =
-        canvas.getContext("2d");
 
       ctx.drawImage(
         video,
@@ -1157,11 +1187,12 @@ async function scanFrame() {
           canvas.height
         );
 
-      const code = jsQR(
-        imageData.data,
-        imageData.width,
-        imageData.height
-      );
+      const code =
+        jsQR(
+          imageData.data,
+          imageData.width,
+          imageData.height
+        );
 
       if (code && code.data) {
 
@@ -1171,15 +1202,16 @@ async function scanFrame() {
       }
     }
 
-  } catch(e) {
+  } catch(err) {
 
-    console.log(e);
+    console.error(err);
 
   }
 
   qrAnimFrame =
     requestAnimationFrame(scanFrame);
 }
+
 
 // ======================================================
 // QR FOUND
@@ -1218,6 +1250,8 @@ function onQRFound(value) {
     }
   }
 
+  // beep
+
   try {
 
     const ctx =
@@ -1255,14 +1289,19 @@ function onQRFound(value) {
 
   } catch(e){}
 
+  // vibrate
+
   if (navigator.vibrate) {
     navigator.vibrate(200);
   }
 
   setTimeout(() => {
+
     closeQR();
+
   }, 1000);
 }
+
 
 // ======================================================
 // CLOSE QR
@@ -1282,6 +1321,7 @@ function closeQR() {
   qrTargetField = null;
 }
 
+
 // ======================================================
 // STATUS
 // ======================================================
@@ -1300,6 +1340,7 @@ function setQrStatus(msg, type) {
     (type ? " " + type : "");
 }
 
+
 // ======================================================
 // SEARCH ITEM
 // ======================================================
@@ -1310,7 +1351,7 @@ async function searchItemClient(type) {
 
   timer = setTimeout(async () => {
 
-    let keyword =
+    const keyword =
       type === "code"
       ? document
           .getElementById("itemCode")
@@ -1331,7 +1372,7 @@ async function searchItemClient(type) {
         { keyword }
       );
 
-    if (!list || list.length === 0) {
+    if (!list || !list.length) {
       return;
     }
 
@@ -1343,91 +1384,133 @@ async function searchItemClient(type) {
       .getElementById("itemName")
       .value = list[0].name;
 
-    const spec =
-      document.getElementById("spec");
-
-    spec.innerHTML = "";
-
-    list.forEach(i => {
-
-      let opt =
-        document.createElement(
-          "option"
-        );
-
-      opt.value = i.spec;
-      opt.text = i.spec;
-
-      spec.appendChild(opt);
-
-    });
-
   }, 300);
 }
 
+
 // ======================================================
-// SEARCH INPUT ITEM
+// LOGIN
 // ======================================================
 
-async function searchInputItem(type) {
+function submitLoginEmail() {
 
-  clearTimeout(timer);
+  const input =
+    document.getElementById(
+      "loginEmailInput"
+    );
 
-  timer = setTimeout(async () => {
+  const email =
+    input.value
+      .trim()
+      .toLowerCase();
 
-    let keyword =
-      type === "code"
-      ? document
-          .getElementById("in_itemCode")
-          .value
-          .trim()
-      : document
-          .getElementById("in_itemName")
-          .value
-          .trim();
+  if (
+    !email.includes("@")
+  ) {
 
-    if (keyword.length < 2) {
-      return;
-    }
+    alert("กรอก Email");
 
-    const list =
-      await api(
-        "searchItem",
-        { keyword }
-      );
+    return;
+  }
 
-    if (!list || list.length === 0) {
-      return;
-    }
+  localStorage.setItem(
+    "pmn_user_email",
+    email
+  );
 
-    document
-      .getElementById("in_itemCode")
-      .value = list[0].code;
+  document
+    .getElementById("loginModal")
+    .style.display = "none";
 
-    document
-      .getElementById("in_itemName")
-      .value = list[0].name;
+  document
+    .getElementById("issuer")
+    .value = email;
+}
 
-    const spec =
-      document.getElementById("in_spec");
 
-    spec.innerHTML = "";
+// ======================================================
+// SAVE
+// ======================================================
 
-    list.forEach(i => {
+async function saveData() {
 
-      let opt =
-        document.createElement(
-          "option"
-        );
+  const data = {
 
-      opt.value = i.spec;
-      opt.text = i.spec;
+    empId:
+      document
+      .getElementById("empId")
+      .value
+      .trim(),
 
-      spec.appendChild(opt);
+    empName:
+      document
+      .getElementById("empName")
+      .value
+      .trim(),
 
-    });
+    itemCode:
+      document
+      .getElementById("itemCode")
+      .value
+      .trim(),
 
-  }, 300);
+    itemName:
+      document
+      .getElementById("itemName")
+      .value
+      .trim(),
+
+    spec:
+      document
+      .getElementById("spec")
+      .value,
+
+    qty:
+      document
+      .getElementById("qty")
+      .value
+      .trim(),
+
+    issuer:
+      document
+      .getElementById("issuer")
+      .value
+      .trim(),
+
+    remark:
+      document
+      .getElementById("remark")
+      .value
+      .trim()
+  };
+
+  const result =
+    await api(
+      "saveStock",
+      { data }
+    );
+
+  console.log(result);
+
+  showModal({
+    title: "Success",
+    text: "บันทึกสำเร็จ",
+    type: "success"
+  });
+}
+
+
+// ======================================================
+// MODAL
+// ======================================================
+
+function showModal({
+  title="",
+  text="",
+  type="info"
+}) {
+
+  alert(title + "\n" + text);
 }
 
 </script>
@@ -1591,6 +1674,29 @@ async function searchInputItem(type) {
   </div>
 </div>
 
+
+<div id="qrModal" class="qr-modal">
+
+  <video
+    id="qrVideo"
+    autoplay
+    playsinline
+    muted
+  ></video>
+
+  <canvas
+    id="qrCanvas"
+    style="display:none;"
+  ></canvas>
+
+  <div id="qrStatus"></div>
+
+  <button onclick="closeQR()">
+    ปิด
+  </button>
+
+</div>
+  
 <script>
 function switchPermTab(os) {
   document.getElementById("tabAndroid").classList.toggle("active", os === "android");
@@ -1803,5 +1909,6 @@ window.addEventListener("load", () => {
   if (window.lucide) lucide.createIcons();
 });
 </script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 </body>
 </html>
