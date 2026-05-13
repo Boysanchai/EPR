@@ -1791,6 +1791,123 @@ async function reject(id) {
   }
 }
 
+
+  // ======================================================
+// NAVIGATION
+// ======================================================
+
+function backToMenu() {
+
+  document
+    .getElementById("reportPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("formPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("detailPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("approvePage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("inputPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("successModal")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .remove("hidden");
+
+  stopAutoRefresh();
+
+  closeQR();
+}
+
+function showReport() {
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("reportPage")
+    .classList
+    .remove("hidden");
+}
+
+function showForm() {
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("formPage")
+    .classList
+    .remove("hidden");
+}
+
+function showApprove() {
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("approvePage")
+    .classList
+    .remove("hidden");
+
+  loadPending();
+
+  startAutoRefresh();
+}
+
+function showInput() {
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("inputPage")
+    .classList
+    .remove("hidden");
+
+  const savedEmail =
+    localStorage.getItem("pmn_user_email") || "";
+
+  const receiver =
+    document.getElementById("in_receiver");
+
+  if(receiver){
+    receiver.value = savedEmail;
+  }
+
+  if(window.lucide){
+    lucide.createIcons();
+  }
+}
+
 </script>
 
 <!-- ================= PERMISSION GUIDE MODAL ================= -->
