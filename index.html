@@ -906,10 +906,10 @@ transform:scale(.98);
 
 <script>
 
-const API_URL = "https://script.google.com/macros/s/AKfycbxXemaC6QHGsEwN5RpxUkFkm32OcAth_OxLxxsNb5m-VKR5d1WgHUqejrCgjG4dZ-KN/exec";
+const API_URL = "YOUR_WEBAPP_URL";
 
 // ======================================================
-// API FETCH
+// API
 // ======================================================
 
 async function api(action, payload = {}) {
@@ -928,6 +928,10 @@ async function api(action, payload = {}) {
   return await response.json();
 }
 
+// ======================================================
+// GLOBAL
+// ======================================================
+
 let currentData = null;
 let timer;
 let lastKeyword = "";
@@ -936,283 +940,364 @@ let pendingData = [];
 let autoRefreshTimer;
 let todayInputList = [];
 
+let qrStream = null;
+let qrAnimFrame = null;
+let qrTargetField = null;
+let barcodeDetector = null;
+
+const hasBarcodeDetector = "BarcodeDetector" in window;
+
 // ======================================================
-// LOGIN
+// OPEN QR
 // ======================================================
 
-function logoutUser() {
+async function openQR(targetFieldId) {
 
-  localStorage.removeItem("pmn_user_email");
+  qrTargetField = targetFieldId;
 
-  document.getElementById("approveCard").style.display = "none";
+  document
+    .getElementById("qrModal")
+    .classList
+    .add("active");
 
-  document.getElementById("userEmail").innerText = "USER";
+  setQrStatus("กำลังเปิดกล้อง...", "");
 
-  document.getElementById("issuer").value = "";
+  if (hasBarcodeDetector) {
 
-  document.getElementById("loginEmailInput").value = "";
-
-  document.getElementById("loginError").style.display = "none";
-
-  document.getElementById("loginModal").style.display = "flex";
-
-  setTimeout(() => {
-    document.getElementById("loginEmailInput").focus();
-  }, 300);
-}
-
-function submitLoginEmail() {
-
-  const input = document.getElementById("loginEmailInput");
-
-  const email = input.value.trim().toLowerCase();
-
-  if (!email.includes("@") || !email.includes(".")) {
-
-    document.getElementById("loginError").style.display = "block";
-
-    return;
+    barcodeDetector =
+      new BarcodeDetector({
+        formats: ["qr_code"]
+      });
   }
 
-  document.getElementById("loginError").style.display = "none";
-
-  document.getElementById("loginModal").style.display = "none";
-
-  localStorage.setItem("pmn_user_email", email);
-
-  applyUserEmail(email);
-
-  const name = email.split("@")[0];
-
-  showModal({
-    title: "เข้าสู่ระบบสำเร็จ",
-    text: `ยินดีต้อนรับ ${name} 👋`,
-    type: "success",
-    autoClose: 1800
-  });
-}
-
-function applyUserEmail(email) {
-
-  const display = email
-    ? email.split("@")[0]
-    : "USER";
-
-  document.getElementById("userEmail").innerText = display;
-
-  document.getElementById("issuer").value = email;
-
-  const APPROVE_WHITELIST = [
-    "boysanchai90@gmail.com",
-    
-  ];
-
-  const allowed = APPROVE_WHITELIST.map(
-    e => e.toLowerCase().trim()
-  );
-
-  if (allowed.includes(email.toLowerCase().trim())) {
-    document.getElementById("approveCard").style.display = "block";
-  }
+  await startCamera();
 }
 
 // ======================================================
-// NAVIGATION
+// START CAMERA
 // ======================================================
 
-function backToMenu() {
-
-  document.getElementById("reportPage").classList.add("hidden");
-  document.getElementById("formPage").classList.add("hidden");
-  document.getElementById("detailPage").classList.add("hidden");
-  document.getElementById("approvePage").classList.add("hidden");
-  document.getElementById("inputPage").classList.add("hidden");
-
-  document.getElementById("menuPage").classList.remove("hidden");
-
-  stopAutoRefresh();
-}
-
-function showReport() {
-
-  document.getElementById("menuPage").classList.add("hidden");
-
-  document.getElementById("reportPage").classList.remove("hidden");
-}
-
-function showForm() {
-
-  document.getElementById("menuPage").classList.add("hidden");
-
-  document.getElementById("formPage").classList.remove("hidden");
-}
-
-function showApprove() {
-
-  document.getElementById("menuPage").classList.add("hidden");
-
-  document.getElementById("approvePage").classList.remove("hidden");
-
-  loadPending();
-
-  startAutoRefresh();
-}
-
-function showInput() {
-
-  document.getElementById("menuPage").classList.add("hidden");
-
-  document.getElementById("inputPage").classList.remove("hidden");
-
-  const savedEmail =
-    localStorage.getItem("pmn_user_email") || "";
-
-  document.getElementById("in_receiver").value = savedEmail;
-}
-
-// ======================================================
-// SEARCH ITEM INPUT
-// ======================================================
-
-async function searchInputItem(type) {
-
-  clearTimeout(timer);
-
-  timer = setTimeout(async () => {
-
-    const keyword = type === "code"
-      ? document.getElementById("in_itemCode").value.trim()
-      : document.getElementById("in_itemName").value.trim();
-
-    if (keyword.length < 3) return;
-
-    const list = await api("searchItem", {
-      keyword
-    });
-
-    if (!list || list.length === 0) return;
-
-    document.getElementById("in_itemCode").value = list[0].code;
-
-    document.getElementById("in_itemName").value = list[0].name;
-
-    const spec = document.getElementById("in_spec");
-
-    spec.innerHTML = "";
-
-    list.forEach(i => {
-
-      let opt = document.createElement("option");
-
-      opt.value = i.spec;
-
-      opt.text = i.spec;
-
-      spec.appendChild(opt);
-
-    });
-
-  }, 350);
-}
-
-// ======================================================
-// SAVE STOCK IN
-// ======================================================
-
-async function saveInput() {
-
-  const data = {
-    itemCode: document.getElementById("in_itemCode").value.trim(),
-    itemName: document.getElementById("in_itemName").value.trim(),
-    spec: document.getElementById("in_spec").value,
-    qty: document.getElementById("in_qty").value.trim(),
-    receiver: document.getElementById("in_receiver").value.trim(),
-    ref: document.getElementById("in_ref").value.trim(),
-    remark: document.getElementById("in_remark").value.trim()
-  };
-
-  if (!data.itemCode || !data.qty) {
-
-    showModal({
-      title: "ข้อมูลไม่ครบ",
-      text: "กรุณากรอกข้อมูล",
-      type: "error"
-    });
-
-    return;
-  }
-
-  const btn = document.getElementById("saveInputBtn");
-
-  btn.disabled = true;
-
-  btn.innerText = "Saving...";
+async function startCamera() {
 
   try {
 
-    const res = await api("saveStockIn", {
-      data
-    });
+    const video =
+      document.getElementById("qrVideo");
 
-    const now = new Date();
+    qrStream =
+      await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: {
+            ideal: "environment"
+          }
+        },
+        audio: false
+      });
 
-    todayInputList.unshift({
-      ...data,
-      time: res.time || now.toLocaleTimeString("th-TH"),
-      date: res.date || now.toLocaleDateString("th-TH")
-    });
+    video.srcObject = qrStream;
 
-    renderInputTable();
+    video.setAttribute(
+      "playsinline",
+      true
+    );
 
-    clearInputForm();
+    video.muted = true;
 
-    showModal({
-      title: "บันทึกสำเร็จ",
-      text: `รับ ${data.itemName} เข้าคลังแล้ว`,
-      type: "success",
-      autoClose: 1800
-    });
+    await video.play();
+
+    scanFrame();
 
   } catch(err) {
 
-    showModal({
-      title: "เกิดข้อผิดพลาด",
-      text: err.message,
-      type: "error"
-    });
+    console.error(err);
 
+    setQrStatus(
+      "เปิดกล้องไม่ได้",
+      "error"
+    );
   }
-
-  btn.disabled = false;
-
-  btn.innerText = "บันทึกรับเข้า";
 }
 
 // ======================================================
-// EMPLOYEE
+// STOP CAMERA
 // ======================================================
 
-async function fetchEmpName() {
+function stopCamera() {
 
-  clearTimeout(timer);
+  if (qrAnimFrame) {
+    cancelAnimationFrame(qrAnimFrame);
+  }
 
-  timer = setTimeout(async () => {
+  if (qrStream) {
 
-    const empId =
-      document.getElementById("empId").value.trim();
+    qrStream
+      .getTracks()
+      .forEach(track => track.stop());
 
-    if (!empId) {
-      document.getElementById("empName").value = "";
-      return;
+    qrStream = null;
+  }
+
+  const video =
+    document.getElementById("qrVideo");
+
+  if (video) {
+
+    video.pause();
+
+    video.srcObject = null;
+  }
+}
+
+// ======================================================
+// SWITCH CAMERA
+// ======================================================
+
+async function switchCamera() {
+
+  stopCamera();
+
+  try {
+
+    qrStream =
+      await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: {
+            ideal: "user"
+          }
+        },
+        audio: false
+      });
+
+    const video =
+      document.getElementById("qrVideo");
+
+    video.srcObject = qrStream;
+
+    await video.play();
+
+    scanFrame();
+
+  } catch(e) {
+
+    setQrStatus(
+      "สลับกล้องไม่สำเร็จ",
+      "error"
+    );
+  }
+}
+
+// ======================================================
+// SCAN FRAME
+// ======================================================
+
+async function scanFrame() {
+
+  const video =
+    document.getElementById("qrVideo");
+
+  if (!video || !qrStream) {
+    return;
+  }
+
+  if (
+    video.readyState < 2 ||
+    video.videoWidth === 0
+  ) {
+
+    qrAnimFrame =
+      requestAnimationFrame(scanFrame);
+
+    return;
+  }
+
+  try {
+
+    if (
+      hasBarcodeDetector &&
+      barcodeDetector
+    ) {
+
+      const codes =
+        await barcodeDetector.detect(video);
+
+      if (codes.length > 0) {
+
+        onQRFound(
+          codes[0].rawValue
+        );
+
+        return;
+      }
+
+    } else {
+
+      const canvas =
+        document.getElementById("qrCanvas");
+
+      canvas.width =
+        video.videoWidth;
+
+      canvas.height =
+        video.videoHeight;
+
+      const ctx =
+        canvas.getContext("2d");
+
+      ctx.drawImage(
+        video,
+        0,
+        0
+      );
+
+      const imageData =
+        ctx.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+      const code = jsQR(
+        imageData.data,
+        imageData.width,
+        imageData.height
+      );
+
+      if (code && code.data) {
+
+        onQRFound(code.data);
+
+        return;
+      }
     }
 
-    const name = await api("getEmployeeName", {
-      empId
-    });
+  } catch(e) {
 
-    document.getElementById("empName").value = name || "";
+    console.log(e);
 
-  }, 300);
+  }
+
+  qrAnimFrame =
+    requestAnimationFrame(scanFrame);
+}
+
+// ======================================================
+// QR FOUND
+// ======================================================
+
+function onQRFound(value) {
+
+  setQrStatus(
+    "✓ พบ QR: " + value,
+    "success"
+  );
+
+  if (qrTargetField) {
+
+    const field =
+      document.getElementById(
+        qrTargetField
+      );
+
+    if (field) {
+
+      field.value = value.trim();
+
+      if (
+        qrTargetField === "in_itemCode"
+      ) {
+
+        searchInputItem("code");
+
+      } else if (
+        qrTargetField === "itemCode"
+      ) {
+
+        searchItemClient("code");
+      }
+    }
+  }
+
+  try {
+
+    const ctx =
+      new AudioContext();
+
+    const osc =
+      ctx.createOscillator();
+
+    const gain =
+      ctx.createGain();
+
+    osc.connect(gain);
+
+    gain.connect(
+      ctx.destination
+    );
+
+    osc.frequency.value = 1200;
+
+    gain.gain.setValueAtTime(
+      0.2,
+      ctx.currentTime
+    );
+
+    gain.gain.exponentialRampToValueAtTime(
+      0.001,
+      ctx.currentTime + 0.15
+    );
+
+    osc.start();
+
+    osc.stop(
+      ctx.currentTime + 0.15
+    );
+
+  } catch(e){}
+
+  if (navigator.vibrate) {
+    navigator.vibrate(200);
+  }
+
+  setTimeout(() => {
+    closeQR();
+  }, 1000);
+}
+
+// ======================================================
+// CLOSE QR
+// ======================================================
+
+function closeQR() {
+
+  stopCamera();
+
+  document
+    .getElementById("qrModal")
+    .classList
+    .remove("active");
+
+  setQrStatus("", "");
+
+  qrTargetField = null;
+}
+
+// ======================================================
+// STATUS
+// ======================================================
+
+function setQrStatus(msg, type) {
+
+  const el =
+    document.getElementById(
+      "qrStatus"
+    );
+
+  el.textContent = msg;
+
+  el.className =
+    "qr-status" +
+    (type ? " " + type : "");
 }
 
 // ======================================================
@@ -1225,662 +1310,125 @@ async function searchItemClient(type) {
 
   timer = setTimeout(async () => {
 
-    let keyword = type === "code"
-      ? document.getElementById("itemCode").value.trim()
-      : document.getElementById("itemName").value.trim();
+    let keyword =
+      type === "code"
+      ? document
+          .getElementById("itemCode")
+          .value
+          .trim()
+      : document
+          .getElementById("itemName")
+          .value
+          .trim();
 
-    if (keyword.length < 3) return;
+    if (keyword.length < 2) {
+      return;
+    }
 
-    lastKeyword = keyword;
+    const list =
+      await api(
+        "searchItem",
+        { keyword }
+      );
 
-    const list = await api("searchItem", {
-      keyword
-    });
+    if (!list || list.length === 0) {
+      return;
+    }
 
-    if (keyword !== lastKeyword) return;
+    document
+      .getElementById("itemCode")
+      .value = list[0].code;
 
-    if (!list || list.length === 0) return;
+    document
+      .getElementById("itemName")
+      .value = list[0].name;
 
-    document.getElementById("itemCode").value = list[0].code;
-
-    document.getElementById("itemName").value = list[0].name;
-
-    const spec = document.getElementById("spec");
+    const spec =
+      document.getElementById("spec");
 
     spec.innerHTML = "";
 
     list.forEach(i => {
 
-      let opt = document.createElement("option");
+      let opt =
+        document.createElement(
+          "option"
+        );
 
       opt.value = i.spec;
-
       opt.text = i.spec;
 
       spec.appendChild(opt);
 
     });
 
-  }, 350);
+  }, 300);
 }
 
 // ======================================================
-// SAVE DATA
+// SEARCH INPUT ITEM
 // ======================================================
 
-async function saveData() {
+async function searchInputItem(type) {
 
-  const data = {
-    empId: document.getElementById('empId').value.trim(),
-    empName: document.getElementById('empName').value.trim(),
-    itemCode: document.getElementById('itemCode').value.trim(),
-    itemName: document.getElementById('itemName').value.trim(),
-    spec: document.getElementById('spec').value,
-    qty: document.getElementById('qty').value.trim(),
-    issuer: document.getElementById('issuer').value.trim(),
-    remark: document.getElementById('remark').value.trim()
-  };
+  clearTimeout(timer);
 
-  if (!data.empId || !data.itemCode || !data.qty) {
+  timer = setTimeout(async () => {
 
-    showModal({
-      title:"ข้อมูลไม่ครบ",
-      text:"กรุณากรอกข้อมูล",
-      type:"error"
+    let keyword =
+      type === "code"
+      ? document
+          .getElementById("in_itemCode")
+          .value
+          .trim()
+      : document
+          .getElementById("in_itemName")
+          .value
+          .trim();
+
+    if (keyword.length < 2) {
+      return;
+    }
+
+    const list =
+      await api(
+        "searchItem",
+        { keyword }
+      );
+
+    if (!list || list.length === 0) {
+      return;
+    }
+
+    document
+      .getElementById("in_itemCode")
+      .value = list[0].code;
+
+    document
+      .getElementById("in_itemName")
+      .value = list[0].name;
+
+    const spec =
+      document.getElementById("in_spec");
+
+    spec.innerHTML = "";
+
+    list.forEach(i => {
+
+      let opt =
+        document.createElement(
+          "option"
+        );
+
+      opt.value = i.spec;
+      opt.text = i.spec;
+
+      spec.appendChild(opt);
+
     });
 
-    return;
-  }
-
-  const btn = document.getElementById("saveBtn");
-
-  btn.innerText = "Saving...";
-
-  btn.disabled = true;
-
-  try {
-
-    await api("saveStock", {
-      data
-    });
-
-    lastSavedData = data;
-
-    showSuccessModal();
-
-    clearForm();
-
-  } catch(err) {
-
-    showModal({
-      title:"เกิดข้อผิดพลาด",
-      text:err.message,
-      type:"error"
-    });
-
-  }
-
-  btn.innerText = "Save Transaction";
-
-  btn.disabled = false;
+  }, 300);
 }
-
-// ======================================================
-// REPORT
-// ======================================================
-
-async function generate() {
-
-  const start = document.getElementById('start').value;
-
-  const end = document.getElementById('end').value;
-
-  const source =
-    document.getElementById('sourceFilter').value;
-
-  const btn = document.getElementById('btn');
-
-  btn.innerText = "Processing...";
-
-  btn.disabled = true;
-
-  const data = await api("getReportData", {
-    startDate: start,
-    endDate: end,
-    sourceFilter: source
-  });
-
-  currentData = data;
-
-  btn.innerText = "Generate";
-
-  btn.disabled = false;
-}
-
-// ======================================================
-// APPROVE
-// ======================================================
-
-function stopAutoRefresh() {
-  clearInterval(autoRefreshTimer);
-}
-
-function startAutoRefresh() {
-  autoRefreshTimer = setInterval(loadPending, 5000);
-}
-
-async function loadPending() {
-
-  const res = await api("getPendingList");
-
-  if (!res.success) {
-
-    showModal({
-      title:"เกิดข้อผิดพลาด",
-      text:res.message,
-      type:"error"
-    });
-
-    return;
-  }
-
-  pendingData = res.rows;
-
-  renderTable();
-}
-
-async function approve(id) {
-
-  await api("approveTransaction", {
-    txId: id
-  });
-
-  showModal({
-    title:"อนุมัติสำเร็จ",
-    text:"รายการได้รับการอนุมัติเรียบร้อยแล้ว",
-    type:"success",
-    autoClose:1000
-  });
-
-  loadPending();
-}
-
-async function reject(id) {
-
-  const reason = prompt("เหตุผลที่ไม่อนุมัติ");
-
-  if (reason === null) return;
-
-  await api("rejectTransaction", {
-    txId: id,
-    reason
-  });
-
-  showModal({
-    title:"ไม่อนุมัติสำเร็จ",
-    text:"รายการถูกปฏิเสธเรียบร้อยแล้ว",
-    type:"error",
-    autoClose:1000
-  });
-
-  loadPending();
-}
-
-// ======================================================
-// LOAD
-// ======================================================
-
-window.onload = () => {
-
-  const savedEmail =
-    localStorage.getItem("pmn_user_email");
-
-  if (savedEmail && savedEmail.includes("@")) {
-
-    applyUserEmail(savedEmail);
-
-  } else {
-
-    document.getElementById("loginModal").style.display = "flex";
-
-    setTimeout(() => {
-
-      document.getElementById("loginEmailInput").focus();
-
-    }, 300);
-  }
-};
-
-
-// ======================================================
-// QR VARIABLES
-// ======================================================
-let qrStream = null;
-let qrAnimFrame = null;
-let qrTargetField = null;
-let barcodeDetector = null;
-const hasBarcodeDetector = 'BarcodeDetector' in window;
-let currentFacingMode = "environment";
-let currentTrack = null;
-let scanRunning = false;
-
-async function openQR(targetFieldId) {
-
-qrTargetField = targetFieldId;
-
-document
-.getElementById("qrModal")
-.classList
-.add("active");
-
-setQrStatus("กำลังเปิดกล้อง...", "");
-
-if (hasBarcodeDetector) {
-
-barcodeDetector = new BarcodeDetector({
-formats: ['qr_code']
-});
-
-}
-
-await startCamera();
-}
-
-
-// ======================================================
-// START CAMERA
-// ======================================================
-
-async function startCamera() {
-
-try {
-
-if (
-!navigator.mediaDevices ||
-!navigator.mediaDevices.getUserMedia
-) {
-
-setQrStatus(
-"Browser ไม่รองรับกล้อง",
-"error"
-);
-
-return;
-}
-
-const video =
-document.getElementById("qrVideo");
-
-qrStream =
-await navigator.mediaDevices.getUserMedia({
-
-video: {
-facingMode: {
-ideal: currentFacingMode
-},
-width: {
-ideal: 1280
-},
-height: {
-ideal: 720
-}
-},
-
-audio: false
-
-});
-
-video.srcObject = qrStream;
-
-video.setAttribute(
-"playsinline",
-true
-);
-
-video.setAttribute(
-"autoplay",
-true
-);
-
-video.setAttribute(
-"muted",
-true
-);
-
-video.muted = true;
-
-await video.play();
-
-setQrStatus(
-"กำลังสแกน QR...",
-""
-);
-
-scanFrame();
-
-} catch(err) {
-
-console.error("Camera error:", err);
-
-setQrStatus(
-"เปิดกล้องไม่ได้\nกรุณาอนุญาต Camera",
-"error"
-);
-
-// แสดง manual input fallback
-const mw = document.getElementById("qrManualWrap");
-if (mw) mw.style.display = "block";
-
-// แสดง permission guide ถ้าเป็น permission error
-if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-  const pg = document.getElementById("permGuide");
-  if (pg) pg.classList.add("active");
-}
-}
-}
-
-
-// ======================================================
-// STOP CAMERA
-// ======================================================
-
-function stopCamera() {
-
-if (qrAnimFrame) {
-
-cancelAnimationFrame(qrAnimFrame);
-
-qrAnimFrame = null;
-}
-
-if (qrStream) {
-
-qrStream
-.getTracks()
-.forEach(track => {
-
-track.stop();
-
-});
-
-qrStream = null;
-}
-
-const video =
-document.getElementById("qrVideo");
-
-if (video) {
-
-video.pause();
-
-video.srcObject = null;
-}
-}
-
-
-// ======================================================
-// SWITCH CAMERA
-// ======================================================
-
-async function switchCamera() {
-
-currentFacingMode =
-currentFacingMode === "environment"
-? "user"
-: "environment";
-
-stopCamera();
-
-await startCamera();
-}
-
-
-// ======================================================
-// SCAN LOOP
-// ======================================================
-
-async function scanFrame() {
-
-const video =
-document.getElementById("qrVideo");
-
-if (!video || !qrStream) {
-return;
-}
-
-if (
-video.readyState < 2 ||
-video.videoWidth === 0
-) {
-
-qrAnimFrame =
-requestAnimationFrame(scanFrame);
-
-return;
-}
-
-try {
-
-// =========================
-// BarcodeDetector
-// =========================
-
-if (
-hasBarcodeDetector &&
-barcodeDetector
-) {
-
-const codes =
-await barcodeDetector.detect(video);
-
-if (codes.length > 0) {
-
-onQRFound(
-codes[0].rawValue
-);
-
-return;
-}
-
-} else {
-
-// =========================
-// jsQR Fallback
-// =========================
-
-const canvas =
-document.getElementById("qrCanvas");
-
-canvas.width =
-video.videoWidth;
-
-canvas.height =
-video.videoHeight;
-
-const ctx =
-canvas.getContext("2d");
-
-ctx.drawImage(
-video,
-0,
-0
-);
-
-const imageData =
-ctx.getImageData(
-0,
-0,
-canvas.width,
-canvas.height
-);
-
-const code = jsQR(
-imageData.data,
-imageData.width,
-imageData.height,
-{
-inversionAttempts:
-"attemptBoth"
-}
-);
-
-if (
-code &&
-code.data
-) {
-
-onQRFound(
-code.data
-);
-
-return;
-}
-}
-
-} catch(e) {
-
-console.error(e);
-
-}
-
-qrAnimFrame =
-requestAnimationFrame(scanFrame);
-}
-
-
-// ======================================================
-// QR FOUND
-// ======================================================
-
-function onQRFound(value) {
-
-setQrStatus(
-"✓ พบ QR: " + value,
-"success"
-);
-
-if (qrTargetField) {
-
-const field =
-document.getElementById(
-qrTargetField
-);
-
-if (field) {
-
-field.value =
-value.trim();
-
-if (
-qrTargetField ===
-"in_itemCode"
-) {
-
-searchInputItem("code");
-
-} else if (
-qrTargetField ===
-"itemCode"
-) {
-
-searchItemClient("code");
-}
-}
-}
-
-// beep
-
-try {
-
-const ctx =
-new AudioContext();
-
-const osc =
-ctx.createOscillator();
-
-const gain =
-ctx.createGain();
-
-osc.connect(gain);
-
-gain.connect(
-ctx.destination
-);
-
-osc.frequency.value = 1200;
-
-gain.gain.setValueAtTime(
-0.2,
-ctx.currentTime
-);
-
-gain.gain.exponentialRampToValueAtTime(
-0.001,
-ctx.currentTime + 0.15
-);
-
-osc.start();
-
-osc.stop(
-ctx.currentTime + 0.15
-);
-
-} catch(e){}
-
-// vibrate
-
-if (navigator.vibrate) {
-navigator.vibrate(200);
-}
-
-setTimeout(() => {
-
-closeQR();
-
-}, 1000);
-}
-
-
-// ======================================================
-// CLOSE QR
-// ======================================================
-
-function closeQR() {
-
-stopCamera();
-
-document
-.getElementById("qrModal")
-.classList
-.remove("active");
-
-setQrStatus("", "");
-
-qrTargetField = null;
-}
-
-
-// ======================================================
-// STATUS
-// ======================================================
-
-function setQrStatus(msg, type) {
-
-const el =
-document.getElementById(
-"qrStatus"
-);
-
-el.textContent = msg;
-
-el.className =
-"qr-status" +
-(type ? " " + type : "");
-}
-
-
-
-  //======//
 
 </script>
 
