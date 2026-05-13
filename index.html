@@ -291,6 +291,58 @@ transform:scale(.98);
 
   cursor:pointer;
 }
+  .qr-modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.85);
+  display:none;
+  justify-content:center;
+  align-items:center;
+  z-index:99999;
+}
+
+.qr-modal.active{
+  display:flex;
+}
+
+.qr-box{
+  width:95%;
+  max-width:500px;
+  background:#111827;
+  border-radius:16px;
+  overflow:hidden;
+  padding:16px;
+}
+
+#qrVideo{
+  width:100%;
+  border-radius:12px;
+  background:black;
+}
+
+.qr-status{
+  color:white;
+  text-align:center;
+  margin-top:12px;
+  font-size:14px;
+}
+
+.qr-actions{
+  display:flex;
+  gap:10px;
+  margin-top:15px;
+}
+
+.qr-actions button{
+  flex:1;
+  border:none;
+  padding:12px;
+  border-radius:10px;
+  background:#2563eb;
+  color:white;
+  font-weight:bold;
+}
+
 
 </style>
 </head>
@@ -983,102 +1035,173 @@ transform:scale(.98);
 // API
 // ======================================================
 
-const API_URL = "https://script.google.com/macros/s/AKfycbxxUrgOOAtyp0X9YQHIQFewT11Ed53tEtbrOKd2WI7BOkkCuwZvl9xIbOFfqvEvSqiL/exec";
+const API_URL =
+"https://script.google.com/macros/s/AKfycbxxUrgOOAtyp0X9YQHIQFewT11Ed53tEtbrOKd2WI7BOkkCuwZvl9xIbOFfqvEvSqiL/exec";
 
 async function api(action, payload = {}) {
 
-  const response = await fetch(API_URL, {
-
-    method: "POST",
-
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8"
+  const response = await fetch(API_URL,{
+    method:"POST",
+    headers:{
+      "Content-Type":"text/plain;charset=utf-8"
     },
-
-    body: JSON.stringify({
+    body:JSON.stringify({
       action,
       ...payload
     })
-
   });
 
   return await response.json();
 }
 
-
 // ======================================================
 // GLOBAL
 // ======================================================
 
-let currentData = null;
-let timer;
-let lastKeyword = "";
-let lastSavedData = null;
-let pendingData = [];
-let autoRefreshTimer;
-let todayInputList = [];
-
-
-// ======================================================
-// QR GLOBAL
-// ======================================================
-
 let qrStream = null;
-let qrAnimFrame = null;
 let qrTargetField = null;
-let barcodeDetector = null;
-
-const hasBarcodeDetector =
-  'BarcodeDetector' in window;
-
+let qrAnimFrame = null;
 
 // ======================================================
-// OPEN QR
+// MENU
 // ======================================================
 
-let qrStream = null;
+function showInput(){
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("inputPage")
+    .classList
+    .remove("hidden");
+}
+
+function showForm(){
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("formPage")
+    .classList
+    .remove("hidden");
+}
+
+function showApprove(){
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("approvePage")
+    .classList
+    .remove("hidden");
+}
+
+function showReport(){
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("reportPage")
+    .classList
+    .remove("hidden");
+}
+
+function backToMenu(){
+
+  document
+    .getElementById("menuPage")
+    .classList
+    .remove("hidden");
+
+  document
+    .getElementById("formPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("inputPage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("approvePage")
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById("reportPage")
+    .classList
+    .add("hidden");
+}
+
+// ======================================================
+// LOGOUT
+// ======================================================
+
+function logoutUser(){
+
+  localStorage.removeItem("pmn_user_email");
+
+  location.reload();
+}
+
+// ======================================================
+// QR
+// ======================================================
 
 async function openQR(targetFieldId){
 
+  qrTargetField = targetFieldId;
+
+  document
+    .getElementById("qrModal")
+    .classList
+    .add("active");
+
+  await startCamera();
+}
+
+// ======================================================
+// START CAMERA
+// ======================================================
+
+async function startCamera(){
+
   try{
 
-    const modal =
-      document.getElementById(
-        "qrModal"
-      );
-
-    modal.classList.add(
-      "active"
-    );
-
     const video =
-      document.getElementById(
-        "qrVideo"
-      );
+      document.getElementById("qrVideo");
+
+    if(!navigator.mediaDevices){
+      alert("Browser ไม่รองรับกล้อง");
+      return;
+    }
 
     qrStream =
-      await navigator
-        .mediaDevices
-        .getUserMedia({
+      await navigator.mediaDevices.getUserMedia({
+        video:{
+          facingMode:"environment"
+        },
+        audio:false
+      });
 
-          video:{
-            facingMode:"environment"
-          },
-
-          audio:false
-        });
-
-    video.srcObject =
-      qrStream;
+    video.srcObject = qrStream;
 
     await video.play();
 
-    document
-      .getElementById(
-        "qrStatus"
-      )
-      .innerText =
-      "เปิดกล้องสำเร็จ";
+    scanFrame();
 
   }catch(err){
 
@@ -1088,147 +1211,6 @@ async function openQR(targetFieldId){
       "เปิดกล้องไม่ได้\n\n" +
       err.message
     );
-
-    document
-      .getElementById(
-        "qrStatus"
-      )
-      .innerText =
-      err.message;
-  }
-}
-  // ======================================================
-// CLOSE QR
-// ======================================================
-
-
-function closeQR(){
-
-  if(qrStream){
-
-    qrStream
-      .getTracks()
-      .forEach(track=>{
-
-        track.stop();
-
-      });
-
-    qrStream = null;
-  }
-
-  document
-    .getElementById(
-      "qrModal"
-    )
-    .classList
-    .remove(
-      "active"
-    );
-}
-
-// ======================================================
-// START CAMERA
-// ======================================================
-
-async function startCamera() {
-
-  try {
-
-    if (!navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia) {
-
-      setQrStatus(
-        "Browser ไม่รองรับ Camera",
-        "error"
-      );
-
-      return;
-    }
-
-    const video =
-      document.getElementById(
-        "qrVideo"
-      );
-
-    if (!video) {
-
-      setQrStatus(
-        "ไม่พบ video element",
-        "error"
-      );
-
-      return;
-    }
-
-    // ปิด stream เก่า
-
-    stopCamera();
-
-    // ลองเปิดกล้องหลัง
-
-    try {
-
-      qrStream =
-        await navigator
-          .mediaDevices
-          .getUserMedia({
-
-            video: {
-              facingMode: {
-                ideal: "environment"
-              }
-            },
-
-            audio: false
-          });
-
-    } catch(err) {
-
-      console.log(
-        "เปิดกล้องหลังไม่ได้",
-        err
-      );
-
-      // fallback กล้องหน้า
-
-      qrStream =
-        await navigator
-          .mediaDevices
-          .getUserMedia({
-
-            video: true,
-            audio: false
-          });
-    }
-
-    video.srcObject = qrStream;
-
-    video.setAttribute(
-      "playsinline",
-      true
-    );
-
-    video.muted = true;
-
-    await video.play();
-
-    setQrStatus(
-      "เปิดกล้องสำเร็จ",
-      "success"
-    );
-
-    scanFrame();
-
-  } catch(err) {
-
-    console.error(err);
-
-    setQrStatus(
-      "เปิดกล้องไม่ได้ : " +
-      err.message,
-      "error"
-    );
   }
 }
 
@@ -1236,68 +1218,40 @@ async function startCamera() {
 // STOP CAMERA
 // ======================================================
 
-function stopCamera() {
+function stopCamera(){
 
-  if (qrAnimFrame) {
-
-    cancelAnimationFrame(
-      qrAnimFrame
-    );
-
-    qrAnimFrame = null;
-  }
-
-  if (qrStream) {
+  if(qrStream){
 
     qrStream
       .getTracks()
-      .forEach(track => {
-
-        track.stop();
-
-      });
+      .forEach(track=>track.stop());
 
     qrStream = null;
   }
 
-  const video =
-    document.getElementById(
-      "qrVideo"
-    );
-
-  if (video) {
-
-    video.pause();
-
-    video.srcObject = null;
-  }
+  cancelAnimationFrame(qrAnimFrame);
 }
 
 // ======================================================
 // SWITCH CAMERA
 // ======================================================
 
-async function switchCamera() {
+async function switchCamera(){
 
   stopCamera();
 
-  try {
-
-    qrStream =
-      await navigator.mediaDevices.getUserMedia({
-
-        video: {
-          facingMode: {
-            ideal: "user"
-          }
-        },
-
-        audio: false
-
-      });
+  try{
 
     const video =
       document.getElementById("qrVideo");
+
+    qrStream =
+      await navigator.mediaDevices.getUserMedia({
+        video:{
+          facingMode:"user"
+        },
+        audio:false
+      });
 
     video.srcObject = qrStream;
 
@@ -1305,156 +1259,97 @@ async function switchCamera() {
 
     scanFrame();
 
-  } catch(e) {
+  }catch(err){
 
-    console.error(e);
+    console.error(err);
 
-    setQrStatus(
-      "สลับกล้องไม่สำเร็จ",
-      "error"
-    );
+    alert("สลับกล้องไม่ได้");
   }
 }
 
-
 // ======================================================
-// SCAN LOOP
+// SCAN FRAME
 // ======================================================
 
-async function scanFrame() {
+async function scanFrame(){
 
   const video =
     document.getElementById("qrVideo");
 
-  if (!video || !qrStream) {
-    return;
-  }
-
-  if (
-    video.readyState < 2 ||
-    video.videoWidth === 0
-  ) {
-
+  if(
+    !video ||
+    video.readyState !== video.HAVE_ENOUGH_DATA
+  ){
     qrAnimFrame =
       requestAnimationFrame(scanFrame);
-
     return;
   }
 
-  try {
+  const canvas =
+    document.getElementById("qrCanvas");
 
-    if (
-      hasBarcodeDetector &&
-      barcodeDetector
-    ) {
+  const ctx =
+    canvas.getContext("2d");
 
-      const codes =
-        await barcodeDetector.detect(video);
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
 
-      if (codes.length > 0) {
+  ctx.drawImage(
+    video,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
-        onQRFound(
-          codes[0].rawValue
-        );
+  const imageData =
+    ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
 
-        return;
-      }
+  const code = jsQR(
+    imageData.data,
+    imageData.width,
+    imageData.height
+  );
 
-    } else {
+  if(code){
 
-      const canvas =
-        document.getElementById("qrCanvas");
+    onQRFound(code.data);
 
-      const ctx =
-        canvas.getContext("2d");
-
-      canvas.width =
-        video.videoWidth;
-
-      canvas.height =
-        video.videoHeight;
-
-      ctx.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
-
-      const imageData =
-        ctx.getImageData(
-          0,
-          0,
-          canvas.width,
-          canvas.height
-        );
-
-      const code = jsQR(
-        imageData.data,
-        imageData.width,
-        imageData.height
-      );
-
-      if (code && code.data) {
-
-        onQRFound(code.data);
-
-        return;
-      }
-    }
-
-  } catch(err) {
-
-    console.error(err);
+    return;
   }
 
   qrAnimFrame =
     requestAnimationFrame(scanFrame);
 }
 
-
 // ======================================================
-// FOUND
+// FOUND QR
 // ======================================================
 
-function onQRFound(value) {
+function onQRFound(value){
 
   setQrStatus(
-    "✓ พบ QR: " + value,
+    "พบ QR : " + value,
     "success"
   );
 
-  if (qrTargetField) {
+  if(qrTargetField){
 
-    const field =
-      document.getElementById(
-        qrTargetField
-      );
+    const input =
+      document.getElementById(qrTargetField);
 
-    if (field) {
+    if(input){
 
-      field.value =
-        value.trim();
-
-      if (
-        qrTargetField ===
-        "in_itemCode"
-      ) {
-
-        searchInputItem("code");
-
-      } else if (
-        qrTargetField ===
-        "itemCode"
-      ) {
-
-        searchItemClient("code");
-      }
+      input.value = value;
     }
   }
 
-  try {
+  try{
 
     const ctx =
       new AudioContext();
@@ -1489,35 +1384,45 @@ function onQRFound(value) {
       ctx.currentTime + 0.15
     );
 
-  } catch(e) {
-    console.error(e);
-  }
+  }catch(e){}
 
-  if (navigator.vibrate) {
-
+  if(navigator.vibrate){
     navigator.vibrate(200);
   }
 
-  setTimeout(() => {
+  setTimeout(()=>{
 
     closeQR();
 
-  }, 1000);
+  },1000);
 }
 
+// ======================================================
+// CLOSE QR
+// ======================================================
 
+function closeQR(){
 
+  stopCamera();
+
+  document
+    .getElementById("qrModal")
+    .classList
+    .remove("active");
+
+  setQrStatus("", "");
+
+  qrTargetField = null;
+}
 
 // ======================================================
 // STATUS
 // ======================================================
 
-function setQrStatus(msg, type) {
+function setQrStatus(msg, type){
 
   const el =
-    document.getElementById(
-      "qrStatus"
-    );
+    document.getElementById("qrStatus");
 
   el.textContent = msg;
 
@@ -2581,7 +2486,43 @@ window.addEventListener("load", () => {
 
 </script>
 
-  
+  <!-- ===================================================== -->
+<!-- QR MODAL -->
+<!-- ===================================================== -->
+
+<div id="qrModal" class="qr-modal">
+
+  <div class="qr-box">
+
+    <video
+      id="qrVideo"
+      autoplay
+      playsinline
+      muted
+    ></video>
+
+    <canvas id="qrCanvas" style="display:none;"></canvas>
+
+    <div id="qrStatus" class="qr-status">
+      กำลังเปิดกล้อง...
+    </div>
+
+    <div class="qr-actions">
+
+      <button onclick="switchCamera()">
+        สลับกล้อง
+      </button>
+
+      <button onclick="closeQR()">
+        ปิด
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
  
 </body>
 </html>
