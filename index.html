@@ -28,7 +28,7 @@ body {
   line-height: 1.55;
   color: var(--text);
   background: #f4f6f9;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 .hidden { display:none; }
 .custom-scroll::-webkit-scrollbar { height: 4px; }
@@ -90,7 +90,7 @@ width:95%;
 max-width:520px;
 background:#111827;
 border-radius:16px;
-overflow:hidden;
+overflow-x:hidden;
 padding:14px;
 box-shadow:0 10px 40px rgba(0,0,0,.4);
 }
@@ -139,6 +139,85 @@ transform:scale(.98);
 }
 
 
+
+/* =============== QR SCAN TRIGGER BUTTON =============== */
+.input-qr-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+.input-qr-row .input {
+  flex: 1;
+}
+.qr-scan-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, #0f1b2d, #1a2d4a);
+  color: #f0d080;
+  border: 1px solid rgba(201,168,76,0.5);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: 0.2s;
+  margin-top: 4px;
+}
+.qr-scan-trigger:hover { background: rgba(201,168,76,0.15); }
+.qr-scan-trigger svg { width: 15px; height: 15px; }
+
+/* =============== QR VIDEO FRAME =============== */
+.qr-video-wrap {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+.qr-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.qr-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: #c9a84c;
+  border-style: solid;
+  border-width: 0;
+}
+.qr-corner.tl { top: 10px; left: 10px; border-top-width: 3px; border-left-width: 3px; border-radius: 3px 0 0 0; }
+.qr-corner.tr { top: 10px; right: 10px; border-top-width: 3px; border-right-width: 3px; border-radius: 0 3px 0 0; }
+.qr-corner.bl { bottom: 10px; left: 10px; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 3px; }
+.qr-corner.br { bottom: 10px; right: 10px; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 3px 0; }
+@keyframes scan {
+  0% { top: 0; } 100% { top: 100%; }
+}
+.qr-scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #c9a84c, transparent);
+  animation: scan 2s linear infinite;
+}
+.qr-close-btn {
+  position: absolute;
+  top: 10px; right: 10px;
+  z-index: 10;
+  background: rgba(255,255,255,0.12);
+  border: none;
+  color: white;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 </style>
 </head>
 
@@ -857,301 +936,6 @@ let pendingData = [];
 let autoRefreshTimer;
 let todayInputList = [];
 
-// ==================== QR SCANNER ====================
-
-let qrStream = null;
-let qrAnimFrame = null;
-let qrTargetField = null;
-let barcodeDetector = null;
-
-const hasBarcodeDetector = 'BarcodeDetector' in window;
-
-// ======================================================
-// QR
-// ======================================================
-
-async function openQR(targetFieldId) {
-
-  qrTargetField = targetFieldId;
-
-  document.getElementById("qrModal").classList.add("active");
-
-  setQrStatus("กำลังเปิดกล้อง...", "");
-
-  if (hasBarcodeDetector) {
-    barcodeDetector = new BarcodeDetector({
-      formats: ['qr_code']
-    });
-  }
-
-  await startCamera();
-}
-
-async function switchCamera() {
-
-  stopCamera();
-
-  try {
-
-    const current = qrStream?.getVideoTracks()[0]?.getSettings()?.facingMode;
-
-    const next = current === "user"
-      ? "environment"
-      : "user";
-
-    qrStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: {
-          ideal: next
-        }
-      },
-      audio: false
-    });
-
-    const video = document.getElementById("qrVideo");
-
-    video.srcObject = qrStream;
-
-    video.muted = true;
-
-    try {
-      await video.play();
-    } catch(e){}
-
-    scanFrame();
-
-  } catch(e) {
-
-    setQrStatus("สลับกล้องไม่สำเร็จ", "error");
-
-  }
-}
-
-async function scanFrame() {
-
-  const video = document.getElementById("qrVideo");
-
-  if (!video || !qrStream) return;
-
-  if (video.readyState < 2 || video.videoWidth === 0) {
-    qrAnimFrame = requestAnimationFrame(scanFrame);
-    return;
-  }
-
-  try {
-
-    if (hasBarcodeDetector && barcodeDetector) {
-
-      const codes = await barcodeDetector.detect(video);
-
-      if (codes.length > 0) {
-        onQRFound(codes[0].rawValue);
-        return;
-      }
-
-    } else {
-
-      const canvas = document.getElementById("qrCanvas");
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      const ctx = canvas.getContext("2d");
-
-      ctx.drawImage(video, 0, 0);
-
-      const imageData = ctx.getImageData(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
-
-      const code = jsQR(
-        imageData.data,
-        imageData.width,
-        imageData.height,
-        {
-          inversionAttempts: "attemptBoth"
-        }
-      );
-
-      if (code && code.data) {
-        onQRFound(code.data);
-        return;
-      }
-    }
-
-  } catch(e){}
-
-  qrAnimFrame = requestAnimationFrame(scanFrame);
-}
-
-function onQRFound(value) {
-
-  setQrStatus("✓ พบ QR: " + value, "success");
-
-  if (qrTargetField) {
-
-    const field = document.getElementById(qrTargetField);
-
-    if (field) {
-
-      field.value = value.trim();
-
-      if (qrTargetField === "in_itemCode") {
-        searchInputItem("code");
-      } else if (qrTargetField === "itemCode") {
-        searchItemClient("code");
-      }
-    }
-  }
-
-  setTimeout(() => {
-    closeQR();
-  }, 800);
-}
-
-function closeQR() {
-
-  stopCamera();
-
-  document.getElementById("qrModal").classList.remove("active");
-
-  setQrStatus("", "");
-
-  qrTargetField = null;
-}
-
-function setQrStatus(msg, type) {
-
-  const el = document.getElementById("qrStatus");
-
-  el.textContent = msg;
-
-  el.className = "qr-status" + (type ? " " + type : "");
-}
-
-// ======================================================
-// CAMERA
-// ======================================================
-
-let currentTrack = null;
-let scanRunning = false;
-
-async function startCamera() {
-
-  try {
-
-    const video = document.getElementById("qrVideo");
-
-    qrStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: {
-          ideal: "environment"
-        },
-        width: {
-          ideal: 1280
-        },
-        height: {
-          ideal: 720
-        }
-      },
-      audio: false
-    });
-
-    currentTrack = qrStream.getVideoTracks()[0];
-
-    video.srcObject = qrStream;
-
-    video.setAttribute("playsinline", true);
-    video.setAttribute("webkit-playsinline", true);
-
-    video.autoplay = true;
-    video.muted = true;
-
-    await video.play();
-
-    scanRunning = true;
-
-    scanFrame();
-
-  } catch(err) {
-
-    console.error(err);
-
-    alert(
-      "เปิดกล้องไม่ได้\n\n" +
-      "1. อนุญาต Camera\n" +
-      "2. เปิดผ่าน HTTPS\n" +
-      "3. ห้ามเปิดผ่าน LINE\n\n" +
-      err.message
-    );
-  }
-}
-
-function stopCamera() {
-
-  scanRunning = false;
-
-  if (qrAnimFrame) {
-    cancelAnimationFrame(qrAnimFrame);
-    qrAnimFrame = null;
-  }
-
-  if (qrStream) {
-
-    qrStream.getTracks().forEach(track => {
-      track.stop();
-    });
-
-    qrStream = null;
-  }
-
-  const video = document.getElementById("qrVideo");
-
-  if (video) {
-    video.pause();
-    video.srcObject = null;
-  }
-}
-
-// ======================================================
-// FLASH
-// ======================================================
-
-async function toggleFlash() {
-
-  try {
-
-    if (!currentTrack) {
-      return;
-    }
-
-    const capabilities = currentTrack.getCapabilities();
-
-    if (!capabilities.torch) {
-
-      alert("มือถือไม่รองรับ Flash");
-
-      return;
-    }
-
-    const settings = currentTrack.getSettings();
-
-    await currentTrack.applyConstraints({
-      advanced: [{
-        torch: !settings.torch
-      }]
-    });
-
-  } catch(err) {
-
-    console.error(err);
-
-  }
-}
-
 // ======================================================
 // LOGIN
 // ======================================================
@@ -1667,34 +1451,9 @@ window.onload = () => {
   }
 };
 
-//========///
-let currentData = null;
-let timer;
-let lastKeyword = "";
-let lastSavedData = null;
-let pendingData = [];
-let autoRefreshTimer;
-let todayInputList = [];
-
-
-// ======================================================
-// QR VARIABLES
-// ======================================================
-
-let qrStream = null;
-let qrAnimFrame = null;
-let qrTargetField = null;
-let barcodeDetector = null;
-
-const hasBarcodeDetector =
-'BarcodeDetector' in window;
 
 let currentFacingMode = "environment";
-
-
-// ======================================================
-// OPEN QR
-// ======================================================
+let currentTrack = null;
 
 async function openQR(targetFieldId) {
 
@@ -2283,44 +2042,207 @@ function switchPermTab(os) {
 async function retryCamera() {
   closePermGuide();
   setQrStatus("กำลังลองเปิดกล้องอีกครั้ง...", "");
-  hideQrManualInput();
-  camChainIdx = 0;
-  await tryNextCamera();
+  document.getElementById("qrManualWrap").style.display = "none";
+  await startCamera();
 }
+
+function closePermGuide() {
+  document.getElementById("permGuide").classList.remove("active");
+}
+
+function submitQrManual() {
+  const val = document.getElementById("qrManualVal").value.trim();
+  if (!val) return;
+  if (qrTargetField) {
+    const field = document.getElementById(qrTargetField);
+    if (field) {
+      field.value = val;
+      if (qrTargetField === "in_itemCode") searchInputItem("code");
+      else if (qrTargetField === "itemCode") searchItemClient("code");
+    }
+  }
+  closeQR();
+}
+
+function decodeQRFromFile(input, targetFieldId) {
+  // fallback: just trigger file picker - jsQR will handle via canvas
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width; canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+      if (code && code.data) {
+        const field = document.getElementById(targetFieldId);
+        if (field) {
+          field.value = code.data.trim();
+          if (targetFieldId === "in_itemCode") searchInputItem("code");
+          else if (targetFieldId === "itemCode") searchItemClient("code");
+        }
+        showToast("สแกน QR สำเร็จ: " + code.data, "success");
+      } else {
+        showToast("ไม่พบ QR Code ในรูปภาพ", "error");
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = "";
+}
+
+function renderInputTable() {
+  const tbody = document.getElementById("inTableBody");
+  if (!tbody) return;
+  if (!todayInputList.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-xs" style="color:#8896a9;">ยังไม่มีรายการ</td></tr>';
+    document.getElementById("inCountBadge").textContent = "0 รายการ";
+    return;
+  }
+  document.getElementById("inCountBadge").textContent = todayInputList.length + " รายการ";
+  tbody.innerHTML = todayInputList.map(r => `<tr class="hover:bg-gray-50">
+    <td class="py-2 px-3 text-xs">${r.itemCode||""}</td>
+    <td class="py-2 px-3 text-xs">${r.itemName||""}</td>
+    <td class="py-2 px-3 text-xs">${r.spec||""}</td>
+    <td class="py-2 px-3 text-xs font-semibold">${r.qty||""}</td>
+    <td class="py-2 px-3 text-xs">${r.ref||""}</td>
+    <td class="py-2 px-3 text-xs">${r.time||""}</td>
+    <td class="py-2 px-3 text-xs">${r.date||""}</td>
+  </tr>`).join("");
+}
+
+function clearInputForm() {
+  ["in_itemCode","in_itemName","in_qty","in_ref","in_remark"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const spec = document.getElementById("in_spec");
+  if (spec) spec.innerHTML = "";
+}
+
+function clearForm() {
+  ["empId","empName","itemCode","itemName","qty","remark"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const spec = document.getElementById("spec");
+  if (spec) spec.innerHTML = "";
+}
+
+function showSuccessModal() {
+  const m = document.getElementById("successModal");
+  if (m) { m.classList.remove("hidden"); m.style.display = "flex"; }
+}
+
+function viewReport() {
+  document.getElementById("successModal").style.display = "none";
+  document.getElementById("successModal").classList.add("hidden");
+  showReport();
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.style.background = type === "error" ? "#dc3545" : type === "success" ? "#198754" : "#0f1b2d";
+  t.classList.remove("hidden");
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.add("hidden"), 3000);
+}
+
+function showModal({ title, text, type, autoClose, actions }) {
+  const m = document.getElementById("globalModal");
+  if (!m) { alert(title + "\n" + text); return; }
+  document.getElementById("modalIcon").innerHTML = type === "success" ? "✓" : type === "error" ? "✕" : "ℹ";
+  document.getElementById("modalIcon").style.background = type === "success" ? "rgba(25,135,84,0.1)" : type === "error" ? "rgba(220,53,69,0.1)" : "rgba(201,168,76,0.1)";
+  document.getElementById("modalIcon").style.color = type === "success" ? "#198754" : type === "error" ? "#dc3545" : "#c9a84c";
+  document.getElementById("modalTitle").textContent = title || "";
+  document.getElementById("modalText").textContent = text || "";
+  const actEl = document.getElementById("modalActions");
+  actEl.innerHTML = "";
+  if (actions && actions.length) {
+    actions.forEach(a => {
+      const btn = document.createElement("button");
+      btn.textContent = a.label;
+      btn.className = "flex-1 py-2 rounded text-sm";
+      btn.style.cssText = a.style || "border:1px solid #c9a84c;color:#c9a84c;";
+      btn.onclick = () => { closeModal(); if(a.onClick) a.onClick(); };
+      actEl.appendChild(btn);
+    });
+  } else {
+    const btn = document.createElement("button");
+    btn.textContent = "ตกลง";
+    btn.className = "flex-1 py-2 rounded text-sm font-semibold";
+    btn.style.cssText = "background:linear-gradient(135deg,#0f1b2d,#1a2d4a);color:#f0d080;";
+    btn.onclick = closeModal;
+    actEl.appendChild(btn);
+  }
+  m.classList.remove("hidden");
+  m.classList.add("show");
+  if (autoClose) setTimeout(closeModal, autoClose);
+}
+
+function closeModal() {
+  const m = document.getElementById("globalModal");
+  if (!m) return;
+  m.classList.add("closing");
+  setTimeout(() => { m.classList.remove("show","closing"); m.classList.add("hidden"); }, 300);
+}
+
+function renderTable() {
+  const tbody = document.getElementById("approveTable");
+  if (!tbody) return;
+  const search = (document.getElementById("searchBox")?.value || "").toLowerCase();
+  const fStart = document.getElementById("f_start")?.value || "";
+  const fEnd = document.getElementById("f_end")?.value || "";
+  let rows = pendingData.filter(r => {
+    const matchText = !search || JSON.stringify(r).toLowerCase().includes(search);
+    const rowDate = r.date || "";
+    const matchStart = !fStart || rowDate >= fStart;
+    const matchEnd = !fEnd || rowDate <= fEnd;
+    return matchText && matchStart && matchEnd;
+  });
+  document.getElementById("countBadge").textContent = rows.length + " รายการ";
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-xs text-gray-400">ไม่มีรายการ</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr class="hover:bg-gray-50">
+      <td class="py-2 text-xs">${r.txId||r.id||""}</td>
+      <td class="py-2 text-xs">${r.empId||""}</td>
+      <td class="py-2 text-xs">${r.itemName||r.item||""}</td>
+      <td class="py-2 text-xs font-semibold">${r.qty||""}</td>
+      <td class="py-2 text-xs">${r.date||""}</td>
+      <td class="py-2 text-xs"><span class="px-2 py-0.5 rounded text-xs" style="background:#fef3c7;color:#92400e;">${r.status||"Pending"}</span></td>
+      <td class="py-2 text-xs">
+        <button onclick="approve(\'${r.txId||r.id}\')" class="px-2 py-1 rounded text-xs mr-1" style="background:#198754;color:#fff;">✓</button>
+        <button onclick="reject(\'${r.txId||r.id}\')" class="px-2 py-1 rounded text-xs" style="background:#dc3545;color:#fff;">✕</button>
+      </td>
+    </tr>`).join("");
+}
+
+function downloadExcel() {
+  if (!currentData || !currentData.length) { showToast("ไม่มีข้อมูล", "error"); return; }
+  const ws = XLSX.utils.json_to_sheet(currentData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  XLSX.writeFile(wb, "PMN_Report_" + new Date().toISOString().slice(0,10) + ".xlsx");
+}
+
+// Initialize lucide icons after DOM ready
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.lucide) lucide.createIcons();
+});
+// Also init after dynamic content if needed
+window.addEventListener("load", () => {
+  if (window.lucide) lucide.createIcons();
+});
 </script>
-
-  <div id="qrModal" class="qr-modal">
-
-<div class="qr-box">
-
-<video
-id="qrVideo"
-autoplay
-playsinline
-muted
-></video>
-
-<canvas
-id="qrCanvas"
-style="display:none;"
-></canvas>
-
-<div id="qrStatus" class="qr-status"></div>
-
-<div class="qr-actions">
-
-<button onclick="switchCamera()">
-🔄 สลับกล้อง
-</button>
-
-<button onclick="closeQR()">
-✖ ปิด
-</button>
-
-</div>
-
-</div>
-
-  </div>
 </body>
-            </html>
+</html>
