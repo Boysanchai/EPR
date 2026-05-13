@@ -903,45 +903,34 @@ transform:scale(.98);
   </div>
 </div>
 
-
 <script>
-
-const API_URL = "https://script.google.com/macros/s/AKfycbxxUrgOOAtyp0X9YQHIQFewT11Ed53tEtbrOKd2WI7BOkkCuwZvl9xIbOFfqvEvSqiL/exec";
 
 // ======================================================
 // API
 // ======================================================
 
+const API_URL = "https://script.google.com/macros/s/AKfycbxxUrgOOAtyp0X9YQHIQFewT11Ed53tEtbrOKd2WI7BOkkCuwZvl9xIbOFfqvEvSqiL/exec";
+
 async function api(action, payload = {}) {
 
-  try {
+  const response = await fetch(API_URL, {
 
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify({
-        action,
-        ...payload
-      })
-    });
+    method: "POST",
 
-    return await response.json();
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
 
-  } catch(err) {
+    body: JSON.stringify({
+      action,
+      ...payload
+    })
 
-    console.error(err);
+  });
 
-    showModal({
-      title: "Network Error",
-      text: err.message,
-      type: "error"
-    });
-
-    throw err;
-  }
+  return await response.json();
 }
+
 
 // ======================================================
 // GLOBAL
@@ -957,7 +946,7 @@ let todayInputList = [];
 
 
 // ======================================================
-// QR SCANNER
+// QR GLOBAL
 // ======================================================
 
 let qrStream = null;
@@ -982,7 +971,10 @@ async function openQR(targetFieldId) {
     .classList
     .add("active");
 
-  setQrStatus("กำลังเปิดกล้อง...", "");
+  setQrStatus(
+    "กำลังเปิดกล้อง...",
+    ""
+  );
 
   if (hasBarcodeDetector) {
 
@@ -1009,12 +1001,15 @@ async function startCamera() {
 
     qrStream =
       await navigator.mediaDevices.getUserMedia({
+
         video: {
           facingMode: {
             ideal: "environment"
           }
         },
+
         audio: false
+
       });
 
     video.srcObject = qrStream;
@@ -1023,8 +1018,6 @@ async function startCamera() {
       "playsinline",
       true
     );
-
-    video.muted = true;
 
     await video.play();
 
@@ -1035,7 +1028,7 @@ async function startCamera() {
     console.error(err);
 
     setQrStatus(
-      "เปิดกล้องไม่ได้",
+      "เปิดกล้องไม่ได้ กรุณาอนุญาต Camera",
       "error"
     );
   }
@@ -1049,7 +1042,10 @@ async function startCamera() {
 function stopCamera() {
 
   if (qrAnimFrame) {
-    cancelAnimationFrame(qrAnimFrame);
+
+    cancelAnimationFrame(
+      qrAnimFrame
+    );
   }
 
   if (qrStream) {
@@ -1085,12 +1081,15 @@ async function switchCamera() {
 
     qrStream =
       await navigator.mediaDevices.getUserMedia({
+
         video: {
           facingMode: {
             ideal: "user"
           }
         },
+
         audio: false
+
       });
 
     const video =
@@ -1098,15 +1097,13 @@ async function switchCamera() {
 
     video.srcObject = qrStream;
 
-    video.muted = true;
-
     await video.play();
 
     scanFrame();
 
-  } catch(err) {
+  } catch(e) {
 
-    console.error(err);
+    console.error(e);
 
     setQrStatus(
       "สลับกล้องไม่สำเร็จ",
@@ -1117,7 +1114,7 @@ async function switchCamera() {
 
 
 // ======================================================
-// SCAN FRAME
+// SCAN LOOP
 // ======================================================
 
 async function scanFrame() {
@@ -1176,7 +1173,9 @@ async function scanFrame() {
       ctx.drawImage(
         video,
         0,
-        0
+        0,
+        canvas.width,
+        canvas.height
       );
 
       const imageData =
@@ -1187,12 +1186,11 @@ async function scanFrame() {
           canvas.height
         );
 
-      const code =
-        jsQR(
-          imageData.data,
-          imageData.width,
-          imageData.height
-        );
+      const code = jsQR(
+        imageData.data,
+        imageData.width,
+        imageData.height
+      );
 
       if (code && code.data) {
 
@@ -1205,7 +1203,6 @@ async function scanFrame() {
   } catch(err) {
 
     console.error(err);
-
   }
 
   qrAnimFrame =
@@ -1214,7 +1211,7 @@ async function scanFrame() {
 
 
 // ======================================================
-// QR FOUND
+// FOUND
 // ======================================================
 
 function onQRFound(value) {
@@ -1233,24 +1230,25 @@ function onQRFound(value) {
 
     if (field) {
 
-      field.value = value.trim();
+      field.value =
+        value.trim();
 
       if (
-        qrTargetField === "in_itemCode"
+        qrTargetField ===
+        "in_itemCode"
       ) {
 
         searchInputItem("code");
 
       } else if (
-        qrTargetField === "itemCode"
+        qrTargetField ===
+        "itemCode"
       ) {
 
         searchItemClient("code");
       }
     }
   }
-
-  // beep
 
   try {
 
@@ -1287,11 +1285,12 @@ function onQRFound(value) {
       ctx.currentTime + 0.15
     );
 
-  } catch(e){}
-
-  // vibrate
+  } catch(e) {
+    console.error(e);
+  }
 
   if (navigator.vibrate) {
+
     navigator.vibrate(200);
   }
 
@@ -1342,16 +1341,62 @@ function setQrStatus(msg, type) {
 
 
 // ======================================================
-// SEARCH ITEM
+// EMPLOYEE
 // ======================================================
 
-async function searchItemClient(type) {
+function fetchEmpName() {
 
   clearTimeout(timer);
 
   timer = setTimeout(async () => {
 
-    const keyword =
+    const empId =
+      document
+      .getElementById("empId")
+      .value
+      .trim();
+
+    if (!empId) {
+
+      document
+      .getElementById("empName")
+      .value = "";
+
+      return;
+    }
+
+    try {
+
+      const name =
+        await api(
+          "getEmployeeName",
+          { empId }
+        );
+
+      document
+        .getElementById("empName")
+        .value = name || "";
+
+    } catch(err) {
+
+      console.error(err);
+    }
+
+  }, 300);
+}
+
+
+// ======================================================
+// SEARCH ITEM
+// ======================================================
+
+function searchItemClient(type) {
+
+  clearTimeout(timer);
+
+  timer = setTimeout(async () => {
+
+    let keyword =
       type === "code"
       ? document
           .getElementById("itemCode")
@@ -1366,70 +1411,127 @@ async function searchItemClient(type) {
       return;
     }
 
-    const list =
-      await api(
-        "searchItem",
-        { keyword }
-      );
+    try {
 
-    if (!list || !list.length) {
+      const list =
+        await api(
+          "searchItem",
+          { keyword }
+        );
+
+      if (!list || list.length === 0) {
+        return;
+      }
+
+      document
+        .getElementById("itemCode")
+        .value = list[0].code;
+
+      document
+        .getElementById("itemName")
+        .value = list[0].name;
+
+      const spec =
+        document.getElementById("spec");
+
+      spec.innerHTML = "";
+
+      list.forEach(i => {
+
+        let opt =
+          document.createElement("option");
+
+        opt.value = i.spec;
+
+        opt.text = i.spec;
+
+        spec.appendChild(opt);
+
+      });
+
+    } catch(err) {
+
+      console.error(err);
+    }
+
+  }, 350);
+}
+
+
+// ======================================================
+// SEARCH INPUT ITEM
+// ======================================================
+
+function searchInputItem(type) {
+
+  clearTimeout(timer);
+
+  timer = setTimeout(async () => {
+
+    let keyword =
+      type === "code"
+      ? document
+          .getElementById("in_itemCode")
+          .value
+          .trim()
+      : document
+          .getElementById("in_itemName")
+          .value
+          .trim();
+
+    if (keyword.length < 2) {
       return;
     }
 
-    document
-      .getElementById("itemCode")
-      .value = list[0].code;
+    try {
 
-    document
-      .getElementById("itemName")
-      .value = list[0].name;
+      const list =
+        await api(
+          "searchItem",
+          { keyword }
+        );
 
-  }, 300);
+      if (!list || list.length === 0) {
+        return;
+      }
+
+      document
+        .getElementById("in_itemCode")
+        .value = list[0].code;
+
+      document
+        .getElementById("in_itemName")
+        .value = list[0].name;
+
+      const spec =
+        document.getElementById("in_spec");
+
+      spec.innerHTML = "";
+
+      list.forEach(i => {
+
+        let opt =
+          document.createElement("option");
+
+        opt.value = i.spec;
+
+        opt.text = i.spec;
+
+        spec.appendChild(opt);
+
+      });
+
+    } catch(err) {
+
+      console.error(err);
+    }
+
+  }, 350);
 }
 
 
 // ======================================================
-// LOGIN
-// ======================================================
-
-function submitLoginEmail() {
-
-  const input =
-    document.getElementById(
-      "loginEmailInput"
-    );
-
-  const email =
-    input.value
-      .trim()
-      .toLowerCase();
-
-  if (
-    !email.includes("@")
-  ) {
-
-    alert("กรอก Email");
-
-    return;
-  }
-
-  localStorage.setItem(
-    "pmn_user_email",
-    email
-  );
-
-  document
-    .getElementById("loginModal")
-    .style.display = "none";
-
-  document
-    .getElementById("issuer")
-    .value = email;
-}
-
-
-// ======================================================
-// SAVE
+// SAVE STOCK
 // ======================================================
 
 async function saveData() {
@@ -1484,33 +1586,209 @@ async function saveData() {
       .trim()
   };
 
-  const result =
-    await api(
-      "saveStock",
-      { data }
-    );
+  try {
 
-  console.log(result);
+    const res =
+      await api(
+        "saveStock",
+        data
+      );
 
-  showModal({
-    title: "Success",
-    text: "บันทึกสำเร็จ",
-    type: "success"
-  });
+    console.log(res);
+
+    alert("บันทึกสำเร็จ");
+
+  } catch(err) {
+
+    console.error(err);
+
+    alert("เกิดข้อผิดพลาด");
+  }
 }
 
 
 // ======================================================
-// MODAL
+// SAVE STOCK IN
 // ======================================================
 
-function showModal({
-  title="",
-  text="",
-  type="info"
-}) {
+async function saveInput() {
 
-  alert(title + "\n" + text);
+  const data = {
+
+    itemCode:
+      document
+      .getElementById("in_itemCode")
+      .value
+      .trim(),
+
+    itemName:
+      document
+      .getElementById("in_itemName")
+      .value
+      .trim(),
+
+    spec:
+      document
+      .getElementById("in_spec")
+      .value,
+
+    qty:
+      document
+      .getElementById("in_qty")
+      .value
+      .trim(),
+
+    receiver:
+      document
+      .getElementById("in_receiver")
+      .value
+      .trim(),
+
+    ref:
+      document
+      .getElementById("in_ref")
+      .value
+      .trim(),
+
+    remark:
+      document
+      .getElementById("in_remark")
+      .value
+      .trim()
+  };
+
+  try {
+
+    const res =
+      await api(
+        "saveStockIn",
+        data
+      );
+
+    console.log(res);
+
+    alert("รับเข้าสำเร็จ");
+
+  } catch(err) {
+
+    console.error(err);
+
+    alert("เกิดข้อผิดพลาด");
+  }
+}
+
+
+// ======================================================
+// REPORT
+// ======================================================
+
+async function generate() {
+
+  const start =
+    document.getElementById("start").value;
+
+  const end =
+    document.getElementById("end").value;
+
+  const source =
+    document.getElementById("sourceFilter").value;
+
+  try {
+
+    const data =
+      await api(
+        "getReportData",
+        {
+          startDate: start,
+          endDate: end,
+          sourceFilter: source
+        }
+      );
+
+    console.log(data);
+
+  } catch(err) {
+
+    console.error(err);
+  }
+}
+
+
+// ======================================================
+// LOAD PENDING
+// ======================================================
+
+async function loadPending() {
+
+  try {
+
+    const res =
+      await api("getPendingList");
+
+    pendingData = res.rows || [];
+
+    console.log(pendingData);
+
+  } catch(err) {
+
+    console.error(err);
+  }
+}
+
+
+// ======================================================
+// APPROVE
+// ======================================================
+
+async function approve(id) {
+
+  try {
+
+    const res =
+      await api(
+        "approveTransaction",
+        { txId: id }
+      );
+
+    console.log(res);
+
+    loadPending();
+
+  } catch(err) {
+
+    console.error(err);
+  }
+}
+
+
+// ======================================================
+// REJECT
+// ======================================================
+
+async function reject(id) {
+
+  const reason =
+    prompt("เหตุผล");
+
+  try {
+
+    const res =
+      await api(
+        "rejectTransaction",
+        {
+          txId: id,
+          reason
+        }
+      );
+
+    console.log(res);
+
+    loadPending();
+
+  } catch(err) {
+
+    console.error(err);
+  }
 }
 
 </script>
